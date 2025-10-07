@@ -2,6 +2,7 @@ import { CstParser } from "chevrotain";
 import {
 	allTokens,
 	And,
+	As,
 	Comma,
 	Equals,
 	From,
@@ -25,13 +26,24 @@ export class SQLParser extends CstParser {
 		this.performSelfAnalysis();
 	}
 
-	// SELECT column1, column2, ... FROM table [WHERE condition]
+	// SELECT column1, column2, ... FROM table [AS alias] [WHERE condition]
 	public selectStatement = this.RULE("selectStatement", () => {
 		this.CONSUME(Select);
 		this.SUBRULE(this.columnList);
 		this.CONSUME(From);
 		this.CONSUME(Identifier);
 		this.OPTION(() => {
+			this.OR([
+				{
+					ALT: () => {
+						this.CONSUME(As);
+						this.CONSUME2(Identifier);
+					},
+				},
+				{ ALT: () => this.CONSUME3(Identifier) },
+			]);
+		});
+		this.OPTION2(() => {
 			this.SUBRULE(this.whereClause);
 		});
 	});

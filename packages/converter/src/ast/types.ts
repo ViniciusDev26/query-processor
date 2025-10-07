@@ -54,6 +54,7 @@ export interface NamedColumn {
 export interface FromClause {
 	type: "FromClause";
 	table: string;
+	alias?: string;
 }
 
 export interface WhereClause {

@@ -49,6 +49,11 @@ export function createASTBuilder(parser: SQLParser) {
 				table: tableName,
 			};
 
+			// Handle alias: either "AS alias" or implicit "alias"
+			if (identifierTokens.length > 1) {
+				from.alias = identifierTokens[1].image;
+			}
+
 			const statement: SelectStatement = {
 				type: "SelectStatement",
 				columns,

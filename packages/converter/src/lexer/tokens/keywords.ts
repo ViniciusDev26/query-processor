@@ -27,3 +27,8 @@ export const Or = createToken({
 	pattern: /OR/i,
 	longer_alt: Identifier,
 });
+export const As = createToken({
+	name: "As",
+	pattern: /AS/i,
+	longer_alt: Identifier,
+});

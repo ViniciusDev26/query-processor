@@ -14,7 +14,7 @@ import {
 	NotEquals,
 	Star,
 } from "./operators";
-import { And, From, Or, Select, Where } from "./keywords";
+import { And, As, From, Or, Select, Where } from "./keywords";
 
 // Token order matters! Keywords must come before Identifier
 // Comparison operators with multiple characters must come before single characters
@@ -26,6 +26,7 @@ export const allTokens = [
 	Where,
 	And,
 	Or,
+	As,
 	// Literals
 	NumberLiteral,
 	StringLiteral,

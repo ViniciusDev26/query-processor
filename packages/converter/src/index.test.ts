@@ -44,4 +44,33 @@ describe("parseSQL", () => {
 		expect(result.where).toBeDefined();
 		expect(result.where?.type).toBe("WhereClause");
 	});
+
+	it("should parse SELECT with table alias using AS", () => {
+		const result = parseSQL("SELECT * FROM users AS u") as SelectStatement;
+		expect(result).toBeDefined();
+		expect(result.from.table).toBe("users");
+		expect(result.from.alias).toBe("u");
+	});
+
+	it("should parse SELECT with implicit table alias", () => {
+		const result = parseSQL("SELECT * FROM users u") as SelectStatement;
+		expect(result).toBeDefined();
+		expect(result.from.table).toBe("users");
+		expect(result.from.alias).toBe("u");
+	});
+
+	it("should parse SELECT without alias", () => {
+		const result = parseSQL("SELECT * FROM users") as SelectStatement;
+		expect(result).toBeDefined();
+		expect(result.from.table).toBe("users");
+		expect(result.from.alias).toBeUndefined();
+	});
+
+	it("should parse SELECT with alias and WHERE clause", () => {
+		const result = parseSQL("SELECT * FROM users AS u WHERE age > 18") as SelectStatement;
+		expect(result).toBeDefined();
+		expect(result.from.table).toBe("users");
+		expect(result.from.alias).toBe("u");
+		expect(result.where).toBeDefined();
+	});
 });
