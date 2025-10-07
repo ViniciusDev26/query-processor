@@ -9,8 +9,7 @@
 	"scripts": {
 		"build": "npm run build --workspaces",
 		"test": "npm run test --workspaces",
-		"dev:converter": "npm run test:watch --workspace=@query-processor/converter",
-		"dev:web": "npm run dev --workspace=@query-processor/web"
+		"test:converter": "npm run test:watch --workspace=@query-processor/converter"
 	},
 	"keywords": [],
 	"author": "",
