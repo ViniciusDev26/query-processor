@@ -1,10 +1,43 @@
 // AST Node Types
 
+// Statements
+export type Statement =
+	| SelectStatement
+	| InsertStatement
+	| UpdateStatement
+	| DeleteStatement;
+
 export interface SelectStatement {
 	type: "SelectStatement";
 	columns: Column[];
 	from: FromClause;
 	where?: WhereClause;
+}
+
+export interface InsertStatement {
+	type: "InsertStatement";
+	table: string;
+	columns?: string[];
+	values: Literal[];
+}
+
+export interface UpdateStatement {
+	type: "UpdateStatement";
+	table: string;
+	assignments: Assignment[];
+	where?: WhereClause;
+}
+
+export interface DeleteStatement {
+	type: "DeleteStatement";
+	table: string;
+	where?: WhereClause;
+}
+
+export interface Assignment {
+	type: "Assignment";
+	column: string;
+	value: Literal;
 }
 
 export type Column = StarColumn | NamedColumn;
@@ -74,10 +107,11 @@ export type ComparisonOperator =
 export type LogicalOperator = "AND" | "OR";
 
 export type ASTNode =
-	| SelectStatement
+	| Statement
 	| Column
 	| FromClause
 	| WhereClause
 	| Expression
 	| Operand
-	| Literal;
+	| Literal
+	| Assignment;

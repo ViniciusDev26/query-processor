@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
+import type {
+	NamedColumn,
+	SelectStatement,
+	StarColumn,
+} from "./ast/types";
 import { parseSQL } from "./index";
-import type { NamedColumn, SelectStatement, StarColumn } from "./ast/types";
 
 describe("parseSQL", () => {
 	it("should parse valid SELECT * FROM query", () => {
-		const result = parseSQL("SELECT * FROM users");
+		const result = parseSQL("SELECT * FROM users") as SelectStatement;
 		expect(result).toBeDefined();
 		expect(result.type).toBe("SelectStatement");
 		expect((result.columns[0] as StarColumn).type).toBe("StarColumn");
@@ -12,7 +16,7 @@ describe("parseSQL", () => {
 	});
 
 	it("should parse valid SELECT with columns", () => {
-		const result = parseSQL("SELECT id, name FROM users");
+		const result = parseSQL("SELECT id, name FROM users") as SelectStatement;
 		expect(result).toBeDefined();
 		expect(result.type).toBe("SelectStatement");
 		expect(result.columns).toHaveLength(2);
@@ -29,13 +33,13 @@ describe("parseSQL", () => {
 	});
 
 	it("should handle case-insensitive input", () => {
-		const result = parseSQL("select id from users");
+		const result = parseSQL("select id from users") as SelectStatement;
 		expect(result).toBeDefined();
 		expect(result.type).toBe("SelectStatement");
 	});
 
 	it("should parse SELECT with WHERE clause", () => {
-		const result = parseSQL("SELECT * FROM users WHERE age > 18");
+		const result = parseSQL("SELECT * FROM users WHERE age > 18") as SelectStatement;
 		expect(result).toBeDefined();
 		expect(result.where).toBeDefined();
 		expect(result.where?.type).toBe("WhereClause");

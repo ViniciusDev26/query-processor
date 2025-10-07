@@ -1,9 +1,9 @@
-import type { SelectStatement } from "./ast/types";
+import type { Statement } from "./ast/types";
 import { SQLLexer } from "./lexer/SQLLexer";
 import { createASTBuilder } from "./parser/ASTBuilder";
 import { SQLParser } from "./parser/SQLParser";
 
-export function parseSQL(input: string): SelectStatement {
+export function parseSQL(input: string): Statement {
 	// Step 1: Tokenize
 	const lexResult = SQLLexer.tokenize(input);
 
