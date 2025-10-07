@@ -1,4 +1,5 @@
 import type { Statement } from "./ast/types";
+import { handleLexerErrors, handleParserErrors } from "./errors";
 import { SQLLexer } from "./lexer/SQLLexer";
 import { createASTBuilder } from "./parser/ASTBuilder";
 import { SQLParser } from "./parser/SQLParser";
@@ -6,23 +7,13 @@ import { SQLParser } from "./parser/SQLParser";
 export function parseSQL(input: string): Statement {
 	// Step 1: Tokenize
 	const lexResult = SQLLexer.tokenize(input);
-
-	if (lexResult.errors.length > 0) {
-		throw new Error(
-			`Lexer errors: ${lexResult.errors.map((e) => e.message).join(", ")}`,
-		);
-	}
+	handleLexerErrors(lexResult.errors);
 
 	// Step 2: Parse to CST
 	const sqlParser = new SQLParser();
 	sqlParser.input = lexResult.tokens;
 	const cst = sqlParser.selectStatement();
-
-	if (sqlParser.errors.length > 0) {
-		throw new Error(
-			`Parser errors: ${sqlParser.errors.map((e) => e.message).join(", ")}`,
-		);
-	}
+	handleParserErrors(sqlParser.errors);
 
 	// Step 3: Build AST from CST
 	const astBuilder = createASTBuilder(sqlParser);
