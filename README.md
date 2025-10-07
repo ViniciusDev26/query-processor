@@ -16,6 +16,7 @@ query-processor/
 SQL parser and converter to Abstract Syntax Tree (AST) and Relational Algebra.
 
 ### Features
+
 - ✅ Lexer with SQL tokens (SELECT, FROM, WHERE, AND, OR, operators)
 - ✅ Parser using Chevrotain (CST → AST)
 - ✅ Type-safe AST generation
@@ -33,6 +34,7 @@ SELECT * FROM users WHERE age < 18 OR age > 65
 ```
 
 ### Tech Stack
+
 - TypeScript
 - Chevrotain (parser)
 - Vitest (testing)
@@ -72,5 +74,5 @@ console.log(ast);
 
 ```bash
 # Run tests in watch mode
-npm run dev:converter
+npm run test:converter
 ```
