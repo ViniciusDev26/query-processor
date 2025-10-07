@@ -1,9 +1,30 @@
+import type {
+	IRecognitionException,
+	IRecognizerContext,
+	IToken,
+} from "chevrotain";
 import { describe, expect, it } from "vitest";
-import type { IRecognitionException } from "chevrotain";
 import { handleParserErrors } from "./parserErrorHandler";
 import { SQLParseError } from "./SQLParseError";
 
 describe("handleParserErrors", () => {
+	const createMockToken = (): IToken => ({
+		image: "",
+		startOffset: 0,
+		startLine: 1,
+		startColumn: 1,
+		endOffset: 0,
+		endLine: 1,
+		endColumn: 1,
+		tokenType: { name: "Mock", PATTERN: /mock/ },
+		tokenTypeIdx: 0,
+	});
+
+	const createMockContext = (): IRecognizerContext => ({
+		ruleStack: [],
+		ruleOccurrenceStack: [],
+	});
+
 	it("should not throw when no errors", () => {
 		expect(() => handleParserErrors([])).not.toThrow();
 	});
@@ -12,9 +33,9 @@ describe("handleParserErrors", () => {
 		const parserError: IRecognitionException = {
 			name: "MismatchedTokenException",
 			message: "Expecting token of type SELECT",
-			token: {} as any,
+			token: createMockToken(),
 			resyncedTokens: [],
-			context: {} as any,
+			context: createMockContext(),
 		};
 
 		expect(() => handleParserErrors([parserError])).toThrow(SQLParseError);
@@ -28,16 +49,16 @@ describe("handleParserErrors", () => {
 			{
 				name: "Error1",
 				message: "Parser error 1",
-				token: {} as any,
+				token: createMockToken(),
 				resyncedTokens: [],
-				context: {} as any,
+				context: createMockContext(),
 			},
 			{
 				name: "Error2",
 				message: "Parser error 2",
-				token: {} as any,
+				token: createMockToken(),
 				resyncedTokens: [],
-				context: {} as any,
+				context: createMockContext(),
 			},
 		];
 
@@ -50,9 +71,9 @@ describe("handleParserErrors", () => {
 		const parserError: IRecognitionException = {
 			name: "TestError",
 			message: "Test parser error",
-			token: {} as any,
+			token: createMockToken(),
 			resyncedTokens: [],
-			context: {} as any,
+			context: createMockContext(),
 		};
 
 		try {

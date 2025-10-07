@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import type { ILexingError } from "chevrotain";
+import { describe, expect, it } from "vitest";
 import { handleLexerErrors } from "./lexerErrorHandler";
 import { SQLParseError } from "./SQLParseError";
 

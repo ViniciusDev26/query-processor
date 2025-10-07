@@ -17,7 +17,7 @@ export function parseSQL(input: string): Statement {
 
 	// Step 3: Build AST from CST
 	const astBuilder = createASTBuilder(sqlParser);
-	const ast = astBuilder.visit(cst);
+	const ast = astBuilder.visit(cst) as Statement;
 
 	return ast;
 }
