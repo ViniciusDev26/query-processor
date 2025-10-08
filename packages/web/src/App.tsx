@@ -20,7 +20,20 @@ function App() {
 		setValidationErrors([]);
 
 		console.log("SQL Query submitted:", sqlQuery);
-		const ast = parseSQL(sqlQuery);
+
+		// Parse SQL to AST
+		const result = parseSQL(sqlQuery);
+
+		if (!result.success) {
+			console.error("Parse error:", result.error, result.details);
+			setValidationErrors([
+				{
+					type: "INVALID_COMPARISON",
+					message: `${result.error}: ${result.details.join(", ")}`,
+				},
+			]);
+			return;
+		}
 
 		// Validate against schema
 		const errors = validateSQL(sqlQuery, databaseSchema);
@@ -31,7 +44,7 @@ function App() {
 			return;
 		}
 
-		console.log("Generated AST:", ast);
+		console.log("Generated AST:", result.ast);
 	}
 
 	return (

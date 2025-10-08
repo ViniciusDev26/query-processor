@@ -1,5 +1,4 @@
 import type { SelectStatement, Statement } from "./ast/types";
-import { handleLexerErrors, handleParserErrors } from "./errors";
 import { SQLLexer } from "./lexer/SQLLexer";
 import { createASTBuilder } from "./parser/ASTBuilder";
 import { SQLParser } from "./parser/SQLParser";
@@ -12,22 +11,50 @@ export type * from "./validator/types";
 export { SchemaValidationError } from "./validator/SchemaValidationError";
 export { SQLParseError } from "./errors";
 
-export function parseSQL(input: string): Statement {
+export interface ParseSuccess {
+	success: true;
+	ast: Statement;
+}
+
+export interface ParseError {
+	success: false;
+	error: string;
+	details: string[];
+}
+
+export type ParseResult = ParseSuccess | ParseError;
+
+export function parseSQL(input: string): ParseResult {
 	// Step 1: Tokenize
 	const lexResult = SQLLexer.tokenize(input);
-	handleLexerErrors(lexResult.errors);
+	if (lexResult.errors.length > 0) {
+		return {
+			success: false,
+			error: "Lexer errors",
+			details: lexResult.errors.map((e) => e.message),
+		};
+	}
 
 	// Step 2: Parse to CST
 	const sqlParser = new SQLParser();
 	sqlParser.input = lexResult.tokens;
 	const cst = sqlParser.selectStatement();
-	handleParserErrors(sqlParser.errors);
+	if (sqlParser.errors.length > 0) {
+		return {
+			success: false,
+			error: "Parser errors",
+			details: sqlParser.errors.map((e) => e.message),
+		};
+	}
 
 	// Step 3: Build AST from CST
 	const astBuilder = createASTBuilder(sqlParser);
 	const ast = astBuilder.visit(cst) as Statement;
 
-	return ast;
+	return {
+		success: true,
+		ast,
+	};
 }
 
 export function validateSQL(
@@ -35,10 +62,20 @@ export function validateSQL(
 	schema: DatabaseSchema,
 ): ValidationError[] {
 	// Parse SQL to AST
-	const ast = parseSQL(input);
+	const parseResult = parseSQL(input);
+
+	// Handle parse errors
+	if (!parseResult.success) {
+		return [
+			{
+				type: "INVALID_COMPARISON",
+				message: parseResult.error,
+			},
+		];
+	}
 
 	// Only SELECT statements are supported for validation
-	if (ast.type !== "SelectStatement") {
+	if (parseResult.ast.type !== "SelectStatement") {
 		return [
 			{
 				type: "INVALID_COMPARISON",
@@ -49,5 +86,5 @@ export function validateSQL(
 
 	// Validate against schema
 	const validator = new SchemaValidator(schema);
-	return validator.validate(ast as SelectStatement);
+	return validator.validate(parseResult.ast as SelectStatement);
 }

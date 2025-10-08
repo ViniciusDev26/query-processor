@@ -1,12 +1,20 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { parseSQL } from "../index";
 import type { SelectStatement } from "../ast/types";
+import { parseSQL } from "../index";
 import { SchemaValidator } from "./SchemaValidator";
 import type { DatabaseSchema } from "./types";
 
 describe("SchemaValidator", () => {
 	let schema: DatabaseSchema;
 	let validator: SchemaValidator;
+
+	// Helper to parse SQL and get AST
+	const parse = (sql: string): SelectStatement => {
+		const result = parseSQL(sql);
+		expect(result.success).toBe(true);
+		if (!result.success) throw new Error("Parse failed");
+		return result.ast as SelectStatement;
+	};
 
 	beforeEach(() => {
 		schema = {
@@ -37,16 +45,14 @@ describe("SchemaValidator", () => {
 
 	describe("Table validation", () => {
 		it("should validate existing table", () => {
-			const ast = parseSQL("SELECT * FROM users") as SelectStatement;
+			const ast = parse("SELECT * FROM users");
 			const errors = validator.validate(ast);
-
 			expect(errors).toHaveLength(0);
 		});
 
 		it("should reject non-existent table", () => {
-			const ast = parseSQL("SELECT * FROM nonexistent") as SelectStatement;
+			const ast = parse("SELECT * FROM nonexistent");
 			const errors = validator.validate(ast);
-
 			expect(errors).toHaveLength(1);
 			expect(errors[0].type).toBe("UNKNOWN_TABLE");
 			expect(errors[0].table).toBe("nonexistent");
@@ -56,14 +62,14 @@ describe("SchemaValidator", () => {
 
 	describe("Column validation", () => {
 		it("should validate existing columns", () => {
-			const ast = parseSQL("SELECT id, name, email FROM users") as SelectStatement;
+			const ast = parse("SELECT id, name, email FROM users");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(0);
 		});
 
 		it("should reject non-existent column", () => {
-			const ast = parseSQL("SELECT id, invalid_column FROM users") as SelectStatement;
+			const ast = parse("SELECT id, invalid_column FROM users");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(1);
@@ -73,7 +79,7 @@ describe("SchemaValidator", () => {
 		});
 
 		it("should allow SELECT *", () => {
-			const ast = parseSQL("SELECT * FROM users") as SelectStatement;
+			const ast = parse("SELECT * FROM users");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(0);
@@ -82,14 +88,14 @@ describe("SchemaValidator", () => {
 
 	describe("WHERE clause validation", () => {
 		it("should validate columns in WHERE clause", () => {
-			const ast = parseSQL("SELECT * FROM users WHERE age > 18") as SelectStatement;
+			const ast = parse("SELECT * FROM users WHERE age > 18");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(0);
 		});
 
 		it("should reject non-existent column in WHERE", () => {
-			const ast = parseSQL("SELECT * FROM users WHERE invalid_col > 18") as SelectStatement;
+			const ast = parse("SELECT * FROM users WHERE invalid_col > 18");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(1);
@@ -100,21 +106,21 @@ describe("SchemaValidator", () => {
 
 	describe("Type compatibility", () => {
 		it("should allow numeric comparisons (INT vs DECIMAL)", () => {
-			const ast = parseSQL("SELECT * FROM users WHERE age > 18") as SelectStatement;
+			const ast = parse("SELECT * FROM users WHERE age > 18");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(0);
 		});
 
 		it("should allow numeric comparisons (TINYINT vs INT)", () => {
-			const ast = parseSQL("SELECT * FROM users WHERE age = 25") as SelectStatement;
+			const ast = parse("SELECT * FROM users WHERE age = 25");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(0);
 		});
 
 		it("should allow string comparisons", () => {
-			const ast = parseSQL("SELECT * FROM users WHERE name = 'John'") as SelectStatement;
+			const ast = parse("SELECT * FROM users WHERE name = 'John'");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(0);
@@ -123,21 +129,21 @@ describe("SchemaValidator", () => {
 		it("should allow DATETIME comparisons", () => {
 			// Note: This requires DATETIME literal support which we don't have yet
 			// For now we test column to column comparison
-			const ast = parseSQL("SELECT * FROM users WHERE created_at = created_at") as SelectStatement;
+			const ast = parse("SELECT * FROM users WHERE created_at = created_at");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(0);
 		});
 
 		it("should allow BOOLEAN equality comparisons", () => {
-			const ast = parseSQL("SELECT * FROM users WHERE is_active = is_active") as SelectStatement;
+			const ast = parse("SELECT * FROM users WHERE is_active = is_active");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(0);
 		});
 
 		it("should reject type mismatch (string vs number)", () => {
-			const ast = parseSQL("SELECT * FROM users WHERE name > 18") as SelectStatement;
+			const ast = parse("SELECT * FROM users WHERE name > 18");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(1);
@@ -147,7 +153,7 @@ describe("SchemaValidator", () => {
 		});
 
 		it("should reject type mismatch (number vs string)", () => {
-			const ast = parseSQL("SELECT * FROM users WHERE age = 'John'") as SelectStatement;
+			const ast = parse("SELECT * FROM users WHERE age = 'John'");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(1);
@@ -155,7 +161,7 @@ describe("SchemaValidator", () => {
 		});
 
 		it("should reject type mismatch (BOOLEAN ordering)", () => {
-			const ast = parseSQL("SELECT * FROM users WHERE is_active > is_active") as SelectStatement;
+			const ast = parse("SELECT * FROM users WHERE is_active > is_active");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(1);
@@ -165,54 +171,60 @@ describe("SchemaValidator", () => {
 
 	describe("Complex WHERE clauses", () => {
 		it("should validate AND expression", () => {
-			const ast = parseSQL("SELECT * FROM users WHERE age > 18 AND is_active = is_active") as SelectStatement;
+			const ast = parse(
+				"SELECT * FROM users WHERE age > 18 AND is_active = is_active",
+			);
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(0);
 		});
 
 		it("should validate OR expression", () => {
-			const ast = parseSQL("SELECT * FROM users WHERE age < 18 OR age > 65") as SelectStatement;
+			const ast = parse("SELECT * FROM users WHERE age < 18 OR age > 65");
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(0);
 		});
 
 		it("should validate parenthesized expressions", () => {
-			const ast = parseSQL("SELECT * FROM users WHERE (age > 18 AND age < 65) OR is_active = is_active") as SelectStatement;
+			const ast = parse(
+				"SELECT * FROM users WHERE (age > 18 AND age < 65) OR is_active = is_active",
+			);
 			const errors = validator.validate(ast);
 
 			expect(errors).toHaveLength(0);
 		});
 
 		it("should collect multiple errors", () => {
-			const ast = parseSQL("SELECT invalid1, invalid2 FROM users WHERE invalid3 > 18") as SelectStatement;
+			const ast = parse(
+				"SELECT invalid1, invalid2 FROM users WHERE invalid3 > 18",
+			);
 			const errors = validator.validate(ast);
 
 			expect(errors.length).toBeGreaterThanOrEqual(3);
-			expect(errors.filter(e => e.type === "UNKNOWN_COLUMN")).toHaveLength(3);
+			expect(errors.filter((e) => e.type === "UNKNOWN_COLUMN")).toHaveLength(3);
 		});
 	});
 
 	describe("Multiple tables", () => {
 		it("should validate different tables", () => {
-			const ast1 = parseSQL("SELECT * FROM users") as SelectStatement;
+			const ast1 = parse("SELECT * FROM users");
 			const errors1 = validator.validate(ast1);
 			expect(errors1).toHaveLength(0);
 
-			const ast2 = parseSQL("SELECT * FROM products") as SelectStatement;
+			const ast2 = parse("SELECT * FROM products");
 			const errors2 = validator.validate(ast2);
 			expect(errors2).toHaveLength(0);
 		});
 
 		it("should not mix columns from different tables", () => {
 			// This tests that validation is per-query
-			const ast = parseSQL("SELECT name FROM users") as SelectStatement;
+			const ast = parse("SELECT name FROM users");
 			const errors = validator.validate(ast);
 			expect(errors).toHaveLength(0);
 
 			// products also has 'name' but this is a new query
-			const ast2 = parseSQL("SELECT price FROM users") as SelectStatement;
+			const ast2 = parse("SELECT price FROM users");
 			const errors2 = validator.validate(ast2);
 			expect(errors2).toHaveLength(1);
 			expect(errors2[0].column).toBe("price");
@@ -229,7 +241,7 @@ describe("SchemaValidator", () => {
 			];
 
 			for (const query of testCases) {
-				const ast = parseSQL(query) as SelectStatement;
+				const ast = parse(query);
 				const errors = validator.validate(ast);
 				expect(errors).toHaveLength(0);
 			}
@@ -244,7 +256,7 @@ describe("SchemaValidator", () => {
 			];
 
 			for (const query of testCases) {
-				const ast = parseSQL(query) as SelectStatement;
+				const ast = parse(query);
 				const errors = validator.validate(ast);
 				expect(errors).toHaveLength(0);
 			}
@@ -259,14 +271,14 @@ describe("SchemaValidator", () => {
 			];
 
 			for (const query of testCases) {
-				const ast = parseSQL(query) as SelectStatement;
+				const ast = parse(query);
 				const errors = validator.validate(ast);
 				expect(errors).toHaveLength(0);
 			}
 		});
 
 		it("should validate mixed case table and columns", () => {
-			const ast = parseSQL("SELECT NAME, EMAIL FROM USERS WHERE AGE > 18") as SelectStatement;
+			const ast = parse("SELECT NAME, EMAIL FROM USERS WHERE AGE > 18");
 			const errors = validator.validate(ast);
 			expect(errors).toHaveLength(0);
 		});
@@ -279,7 +291,7 @@ describe("SchemaValidator", () => {
 			];
 
 			for (const query of testCases) {
-				const ast = parseSQL(query) as SelectStatement;
+				const ast = parse(query);
 				const errors = validator.validate(ast);
 				expect(errors).toHaveLength(1);
 				expect(errors[0].type).toBe("UNKNOWN_COLUMN");
@@ -294,7 +306,7 @@ describe("SchemaValidator", () => {
 			];
 
 			for (const query of testCases) {
-				const ast = parseSQL(query) as SelectStatement;
+				const ast = parse(query);
 				const errors = validator.validate(ast);
 				expect(errors).toHaveLength(1);
 				expect(errors[0].type).toBe("UNKNOWN_TABLE");
