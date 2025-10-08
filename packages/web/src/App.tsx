@@ -55,6 +55,7 @@ function App() {
 				value={sqlQuery}
 				onChange={setSqlQuery}
 				onExecute={handleSqlSubmit}
+				schema={databaseSchema}
 			/>
 			<section className="w-full mt-4">
 				<CodeViewer
