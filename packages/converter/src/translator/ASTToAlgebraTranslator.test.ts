@@ -6,7 +6,7 @@ describe("ASTToAlgebraTranslator", () => {
 	const translator = new ASTToAlgebraTranslator();
 
 	describe("translate", () => {
-		it("should return not implemented error for any query", () => {
+		it("should translate simple SELECT * query", () => {
 			const ast: SelectStatement = {
 				type: "SelectStatement",
 				columns: [{ type: "StarColumn" }],
@@ -21,12 +21,16 @@ describe("ASTToAlgebraTranslator", () => {
 
 			const result = translator.translate(ast);
 
-			expect(result.success).toBe(false);
-			if (!result.success) {
-				expect(result.error).toBe("Translation not implemented");
-				expect(result.details).toContain(
-					"The AST to Relational Algebra translator is not yet implemented",
-				);
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.algebra).toEqual({
+					type: "Projection",
+					attributes: ["*"],
+					input: {
+						type: "Relation",
+						name: "users",
+					},
+				});
 			}
 		});
 

@@ -45,6 +45,8 @@ function App() {
 		}
 
 		console.log("Generated AST:", result.ast);
+		console.log("Relational Algebra:", result.translation);
+		console.log("Relational Algebra String:", result.translationString);
 	}
 
 	return (
@@ -53,6 +55,7 @@ function App() {
 				value={sqlQuery}
 				onChange={setSqlQuery}
 				onExecute={handleSqlSubmit}
+				schema={databaseSchema}
 			/>
 			<section className="w-full mt-4">
 				<CodeViewer

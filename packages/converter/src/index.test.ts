@@ -17,6 +17,10 @@ describe("parseSQL", () => {
 			expect((ast.columns[0] as StarColumn).type).toBe("StarColumn");
 			expect(ast.from.source.type).toBe("TableSource");
 			expect((ast.from.source as TableSource).table).toBe("users");
+
+			// Check translation
+			expect(result.translation.success).toBe(true);
+			expect(result.translationString).toBe("π[*](users)");
 		}
 	});
 
@@ -29,6 +33,10 @@ describe("parseSQL", () => {
 			expect(ast.columns).toHaveLength(2);
 			expect((ast.columns[0] as NamedColumn).name).toBe("id");
 			expect((ast.columns[1] as NamedColumn).name).toBe("name");
+
+			// Check translation
+			expect(result.translation.success).toBe(true);
+			expect(result.translationString).toBe("π[id, name](users)");
 		}
 	});
 
@@ -66,6 +74,10 @@ describe("parseSQL", () => {
 			const ast = result.ast as SelectStatement;
 			expect(ast.where).toBeDefined();
 			expect(ast.where?.type).toBe("WhereClause");
+
+			// Check translation
+			expect(result.translation.success).toBe(true);
+			expect(result.translationString).toBe("π[*](σ[age > 18](users))");
 		}
 	});
 
@@ -135,9 +147,7 @@ describe("parseSQL", () => {
 	});
 
 	it("should parse SELECT with subquery in FROM", () => {
-		const result = parseSQL(
-			"SELECT id FROM (SELECT * FROM users) AS u",
-		);
+		const result = parseSQL("SELECT id FROM (SELECT * FROM users) AS u");
 		expect(result.success).toBe(true);
 		if (result.success) {
 			const ast = result.ast as SelectStatement;
@@ -147,13 +157,15 @@ describe("parseSQL", () => {
 			if (ast.from.source.type === "SubquerySource") {
 				expect(ast.from.source.subquery.type).toBe("SelectStatement");
 			}
+
+			// Check translation
+			expect(result.translation.success).toBe(true);
+			expect(result.translationString).toBe("π[id](π[*](users))");
 		}
 	});
 
 	it("should parse SELECT with subquery without AS keyword", () => {
-		const result = parseSQL(
-			"SELECT id FROM (SELECT * FROM users) u",
-		);
+		const result = parseSQL("SELECT id FROM (SELECT * FROM users) u");
 		expect(result.success).toBe(true);
 		if (result.success) {
 			const ast = result.ast as SelectStatement;
@@ -174,6 +186,34 @@ describe("parseSQL", () => {
 				const innerQuery = ast.from.source.subquery;
 				expect(innerQuery.from.source.type).toBe("SubquerySource");
 			}
+
+			// Check translation
+			expect(result.translation.success).toBe(true);
+			expect(result.translationString).toBe("π[id](π[*](π[*](users)))");
+		}
+	});
+
+	it("should translate SELECT with multiple columns and WHERE", () => {
+		const result = parseSQL("SELECT name, age FROM users WHERE age >= 21");
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.translation.success).toBe(true);
+			expect(result.translationString).toBe(
+				"π[name, age](σ[age >= 21](users))",
+			);
+		}
+	});
+
+	it("should translate SELECT with complex WHERE clause", () => {
+		const result = parseSQL(
+			"SELECT id FROM users WHERE age > 18 AND name = 'John'",
+		);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.translation.success).toBe(true);
+			expect(result.translationString).toBe(
+				"π[id](σ[(age > 18 AND name = 'John')](users))",
+			);
 		}
 	});
 
