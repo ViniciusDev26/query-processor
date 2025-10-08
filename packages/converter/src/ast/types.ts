@@ -54,8 +54,18 @@ export interface NamedColumn {
 
 export interface FromClause {
 	type: "FromClause";
-	table: string;
+	source: TableSource | SubquerySource;
 	alias?: string;
+}
+
+export interface TableSource {
+	type: "TableSource";
+	table: string;
+}
+
+export interface SubquerySource {
+	type: "SubquerySource";
+	subquery: SelectStatement;
 }
 
 export interface JoinClause {
@@ -120,6 +130,8 @@ export type ASTNode =
 	| Statement
 	| Column
 	| FromClause
+	| TableSource
+	| SubquerySource
 	| JoinClause
 	| WhereClause
 	| Expression

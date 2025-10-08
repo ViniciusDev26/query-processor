@@ -34,7 +34,10 @@ describe("ASTBuilder", () => {
 			expect(ast.columns).toHaveLength(1);
 			expect((ast.columns[0] as StarColumn).type).toBe("StarColumn");
 			expect(ast.from.type).toBe("FromClause");
-			expect(ast.from.table).toBe("users");
+			expect(ast.from.source.type).toBe("TableSource");
+		if (ast.from.source.type === "TableSource") {
+			expect(ast.from.source.table).toBe("users");
+		}
 			expect(ast.where).toBeUndefined();
 		});
 
@@ -45,7 +48,10 @@ describe("ASTBuilder", () => {
 			expect(ast.columns).toHaveLength(1);
 			expect((ast.columns[0] as NamedColumn).type).toBe("NamedColumn");
 			expect((ast.columns[0] as NamedColumn).name).toBe("id");
-			expect(ast.from.table).toBe("users");
+			expect(ast.from.source.type).toBe("TableSource");
+		if (ast.from.source.type === "TableSource") {
+			expect(ast.from.source.table).toBe("users");
+		}
 		});
 
 		it("should build AST for SELECT with multiple columns", () => {

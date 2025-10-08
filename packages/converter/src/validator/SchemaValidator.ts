@@ -36,19 +36,41 @@ export class SchemaValidator {
 		this.currentTable = undefined;
 		this.availableTables.clear();
 
-		// Validate FROM clause
-		this.validateTable(ast.from.table);
-		if (this.errors.length > 0) {
-			return this.errors; // Stop if table doesn't exist
+		// Validate FROM clause source
+		if (ast.from.source.type === "TableSource") {
+			const tableName = ast.from.source.table;
+			this.validateTable(tableName);
+			if (this.errors.length > 0) {
+				return this.errors; // Stop if table doesn't exist
+			}
+
+			// Use the actual table name from schema (case-insensitive match)
+			const actualTableName = this.findTableName(tableName);
+			this.currentTable = actualTableName || tableName;
+
+			// Register FROM table with its alias
+			const fromAlias = ast.from.alias || this.currentTable;
+			this.availableTables.set(fromAlias.toLowerCase(), this.currentTable);
+		} else {
+			// Subquery - validate it recursively
+			const subqueryErrors = this.validate(ast.from.source.subquery);
+			if (subqueryErrors.length > 0) {
+				this.errors.push(...subqueryErrors);
+				return this.errors;
+			}
+
+			// For subqueries, we need an alias to reference it
+			if (!ast.from.alias) {
+				this.errors.push({
+					type: "INVALID_COMPARISON",
+					message: "Subquery in FROM clause must have an alias",
+				});
+				return this.errors;
+			}
+
+			// Register the subquery alias (we can't validate columns from it for now)
+			this.availableTables.set(ast.from.alias.toLowerCase(), ast.from.alias);
 		}
-
-		// Use the actual table name from schema (case-insensitive match)
-		const actualTableName = this.findTableName(ast.from.table);
-		this.currentTable = actualTableName || ast.from.table;
-
-		// Register FROM table with its alias
-		const fromAlias = ast.from.alias || this.currentTable;
-		this.availableTables.set(fromAlias.toLowerCase(), this.currentTable);
 
 		// Validate JOIN clauses
 		if (ast.joins) {

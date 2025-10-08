@@ -32,24 +32,21 @@ export class SQLParser extends CstParser {
 		this.performSelfAnalysis();
 	}
 
-	// SELECT column1, column2, ... FROM table [AS alias] [JOIN ...] [WHERE condition]
+	// SELECT column1, column2, ... FROM (table | subquery) [AS alias] [JOIN ...] [WHERE condition]
 	public selectStatement = this.RULE("selectStatement", () => {
 		this.CONSUME(Select);
 		this.SUBRULE(this.columnList);
 		this.CONSUME(From);
-		this.OR([
-			{ ALT: () => this.CONSUME(Identifier) },
-			{ ALT: () => this.CONSUME(StringLiteral) },
-		]);
+		this.SUBRULE(this.fromSource);
 		this.OPTION(() => {
-			this.OR2([
+			this.OR([
 				{
 					ALT: () => {
 						this.CONSUME(As);
-						this.CONSUME2(Identifier);
+						this.CONSUME(Identifier);
 					},
 				},
-				{ ALT: () => this.CONSUME3(Identifier) },
+				{ ALT: () => this.CONSUME2(Identifier) },
 			]);
 		});
 		this.MANY(() => {
@@ -58,6 +55,21 @@ export class SQLParser extends CstParser {
 		this.OPTION2(() => {
 			this.SUBRULE(this.whereClause);
 		});
+	});
+
+	// table_name | (subquery)
+	private fromSource = this.RULE("fromSource", () => {
+		this.OR([
+			{
+				ALT: () => {
+					this.CONSUME(LParen);
+					this.SUBRULE(this.selectStatement);
+					this.CONSUME(RParen);
+				},
+			},
+			{ ALT: () => this.CONSUME(Identifier) },
+			{ ALT: () => this.CONSUME(StringLiteral) },
+		]);
 	});
 
 	// column1, column2, ... | *

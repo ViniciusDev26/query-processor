@@ -14,6 +14,8 @@ import type {
 	SelectStatement,
 	StarColumn,
 	StringLiteral,
+	SubquerySource,
+	TableSource,
 	WhereClause,
 } from "../ast/types";
 import type { SQLParser } from "./SQLParser";
@@ -41,30 +43,28 @@ export function createASTBuilder(parser: SQLParser) {
 
 			const columns = this.visit(columnListNodes) as Column[];
 
-			// Table name can be either Identifier or StringLiteral
-			let tableName: string;
-			if (ctx.Identifier) {
-				const identifierTokens = ctx.Identifier as IToken[];
-				tableName = identifierTokens[0].image;
-			} else if (ctx.StringLiteral) {
-				const stringTokens = ctx.StringLiteral as IToken[];
-				const rawValue = stringTokens[0].image;
-				tableName = rawValue.slice(1, -1); // Remove quotes
-			} else {
-				throw new Error("Missing table name in selectStatement");
+			// Process FROM source (table or subquery)
+			if (!ctx.fromSource) {
+				throw new Error("Missing fromSource in selectStatement");
 			}
+
+			const fromSourceNodes = ctx.fromSource;
+			if (!isCstNodeArray(fromSourceNodes)) {
+				throw new Error("fromSource is not a CstNode array");
+			}
+
+			const source = this.visit(fromSourceNodes) as TableSource | SubquerySource;
 
 			const from: FromClause = {
 				type: "FromClause",
-				table: tableName,
+				source,
 			};
 
 			// Handle alias: either "AS alias" or implicit "alias"
 			if (ctx.Identifier) {
 				const identifierTokens = ctx.Identifier as IToken[];
-				if (identifierTokens.length > 1) {
-					from.alias = identifierTokens[1].image;
-				}
+				// The first identifier is the alias (could be after AS or implicit)
+				from.alias = identifierTokens[0].image;
 			}
 
 			const statement: SelectStatement = {
@@ -91,6 +91,40 @@ export function createASTBuilder(parser: SQLParser) {
 			}
 
 			return statement;
+		}
+
+		fromSource(ctx: CstContext): TableSource | SubquerySource {
+			// Check if it's a subquery (has selectStatement)
+			if (ctx.selectStatement) {
+				const selectStatementNodes = ctx.selectStatement;
+				if (!isCstNodeArray(selectStatementNodes)) {
+					throw new Error("selectStatement is not a CstNode array");
+				}
+
+				const subquery = this.visit(selectStatementNodes) as SelectStatement;
+				return {
+					type: "SubquerySource",
+					subquery,
+				};
+			}
+
+			// Otherwise it's a table name
+			let tableName: string;
+			if (ctx.Identifier) {
+				const identifierTokens = ctx.Identifier as IToken[];
+				tableName = identifierTokens[0].image;
+			} else if (ctx.StringLiteral) {
+				const stringTokens = ctx.StringLiteral as IToken[];
+				const rawValue = stringTokens[0].image;
+				tableName = rawValue.slice(1, -1); // Remove quotes
+			} else {
+				throw new Error("Missing table name in fromSource");
+			}
+
+			return {
+				type: "TableSource",
+				table: tableName,
+			};
 		}
 
 		columnList(ctx: CstContext): Column[] {

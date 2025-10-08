@@ -3,6 +3,7 @@ import type {
 	NamedColumn,
 	SelectStatement,
 	StarColumn,
+	TableSource,
 } from "./ast/types";
 import { parseSQL } from "./index";
 
@@ -14,7 +15,8 @@ describe("parseSQL", () => {
 			const ast = result.ast as SelectStatement;
 			expect(ast.type).toBe("SelectStatement");
 			expect((ast.columns[0] as StarColumn).type).toBe("StarColumn");
-			expect(ast.from.table).toBe("users");
+			expect(ast.from.source.type).toBe("TableSource");
+			expect((ast.from.source as TableSource).table).toBe("users");
 		}
 	});
 
@@ -72,7 +74,8 @@ describe("parseSQL", () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			const ast = result.ast as SelectStatement;
-			expect(ast.from.table).toBe("users");
+			expect(ast.from.source.type).toBe("TableSource");
+			expect((ast.from.source as TableSource).table).toBe("users");
 			expect(ast.from.alias).toBe("u");
 		}
 	});
@@ -82,7 +85,8 @@ describe("parseSQL", () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			const ast = result.ast as SelectStatement;
-			expect(ast.from.table).toBe("users");
+			expect(ast.from.source.type).toBe("TableSource");
+			expect((ast.from.source as TableSource).table).toBe("users");
 			expect(ast.from.alias).toBe("u");
 		}
 	});
@@ -92,7 +96,8 @@ describe("parseSQL", () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			const ast = result.ast as SelectStatement;
-			expect(ast.from.table).toBe("users");
+			expect(ast.from.source.type).toBe("TableSource");
+			expect((ast.from.source as TableSource).table).toBe("users");
 			expect(ast.from.alias).toBeUndefined();
 		}
 	});
@@ -102,7 +107,8 @@ describe("parseSQL", () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			const ast = result.ast as SelectStatement;
-			expect(ast.from.table).toBe("users");
+			expect(ast.from.source.type).toBe("TableSource");
+			expect((ast.from.source as TableSource).table).toBe("users");
 			expect(ast.from.alias).toBe("u");
 			expect(ast.where).toBeDefined();
 		}
@@ -113,7 +119,8 @@ describe("parseSQL", () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			const ast = result.ast as SelectStatement;
-			expect(ast.from.table).toBe("users");
+			expect(ast.from.source.type).toBe("TableSource");
+			expect((ast.from.source as TableSource).table).toBe("users");
 		}
 	});
 
@@ -122,7 +129,51 @@ describe("parseSQL", () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			const ast = result.ast as SelectStatement;
-			expect(ast.from.table).toBe("users");
+			expect(ast.from.source.type).toBe("TableSource");
+			expect((ast.from.source as TableSource).table).toBe("users");
+		}
+	});
+
+	it("should parse SELECT with subquery in FROM", () => {
+		const result = parseSQL(
+			"SELECT id FROM (SELECT * FROM users) AS u",
+		);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			const ast = result.ast as SelectStatement;
+			expect(ast.type).toBe("SelectStatement");
+			expect(ast.from.source.type).toBe("SubquerySource");
+			expect(ast.from.alias).toBe("u");
+			if (ast.from.source.type === "SubquerySource") {
+				expect(ast.from.source.subquery.type).toBe("SelectStatement");
+			}
+		}
+	});
+
+	it("should parse SELECT with subquery without AS keyword", () => {
+		const result = parseSQL(
+			"SELECT id FROM (SELECT * FROM users) u",
+		);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			const ast = result.ast as SelectStatement;
+			expect(ast.from.source.type).toBe("SubquerySource");
+			expect(ast.from.alias).toBe("u");
+		}
+	});
+
+	it("should parse nested subqueries", () => {
+		const result = parseSQL(
+			"SELECT id FROM (SELECT * FROM (SELECT * FROM users) AS inner_query) AS outer_query",
+		);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			const ast = result.ast as SelectStatement;
+			expect(ast.from.source.type).toBe("SubquerySource");
+			if (ast.from.source.type === "SubquerySource") {
+				const innerQuery = ast.from.source.subquery;
+				expect(innerQuery.from.source.type).toBe("SubquerySource");
+			}
 		}
 	});
 });
