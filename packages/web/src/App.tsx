@@ -45,6 +45,8 @@ function App() {
 		}
 
 		console.log("Generated AST:", result.ast);
+		console.log("Relational Algebra:", result.translation);
+		console.log("Relational Algebra String:", result.translationString);
 	}
 
 	return (
