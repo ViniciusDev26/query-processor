@@ -13,6 +13,13 @@ import type { DatabaseSchema, ValidationError } from "./validator/types";
 // Re-export types
 export type * from "./ast/types";
 export type * from "./autocomplete";
+// Re-export autocomplete functions
+export {
+	getAutocompleteSuggestions,
+	getComparisonOperators,
+	getSqlKeywords,
+	SuggestionKind,
+} from "./autocomplete";
 export { SQLParseError } from "./errors";
 export {
 	ASTToAlgebraTranslator,
@@ -21,14 +28,6 @@ export {
 export type * from "./translator/types";
 export { SchemaValidationError } from "./validator/SchemaValidationError";
 export type * from "./validator/types";
-
-// Re-export autocomplete functions
-export {
-	getAutocompleteSuggestions,
-	getComparisonOperators,
-	getSqlKeywords,
-	SuggestionKind,
-} from "./autocomplete";
 
 export interface ParseSuccess {
 	success: true;
