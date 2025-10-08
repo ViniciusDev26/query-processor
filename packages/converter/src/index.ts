@@ -8,8 +8,10 @@ import type { DatabaseSchema, ValidationError } from "./validator/types";
 // Re-export types
 export type * from "./ast/types";
 export type * from "./validator/types";
+export type * from "./translator/types";
 export { SchemaValidationError } from "./validator/SchemaValidationError";
 export { SQLParseError } from "./errors";
+export { ASTToAlgebraTranslator } from "./translator";
 
 export interface ParseSuccess {
 	success: true;
