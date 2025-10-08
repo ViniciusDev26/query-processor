@@ -73,4 +73,16 @@ describe("parseSQL", () => {
 		expect(result.from.alias).toBe("u");
 		expect(result.where).toBeDefined();
 	});
+
+	it("should parse SELECT with double-quoted string literals", () => {
+		const result = parseSQL('SELECT name FROM "users"') as SelectStatement;
+		expect(result).toBeDefined();
+		expect(result.from.table).toBe("users");
+	});
+
+	it("should parse SELECT with single-quoted string literals", () => {
+		const result = parseSQL("SELECT name FROM 'users'") as SelectStatement;
+		expect(result).toBeDefined();
+		expect(result.from.table).toBe("users");
+	});
 });

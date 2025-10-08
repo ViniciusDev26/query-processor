@@ -2,12 +2,14 @@
 	"name": "@query-processor/converter",
 	"version": "1.0.0",
 	"description": "SQL to Relational Algebra converter",
+	"type": "module",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"files": ["dist"],
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
 			"default": "./dist/index.js"
 		}
 	},

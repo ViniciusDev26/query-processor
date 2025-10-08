@@ -14,7 +14,7 @@ export const NumberLiteral = createToken({
 
 export const StringLiteral = createToken({
 	name: "StringLiteral",
-	pattern: /'([^'\\]|\\.)*'/,
+	pattern: /'([^'\\]|\\.)*'|"([^"\\]|\\.)*"/,
 });
 
 // Whitespace (skipped)

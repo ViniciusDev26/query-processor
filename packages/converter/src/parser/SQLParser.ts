@@ -31,9 +31,12 @@ export class SQLParser extends CstParser {
 		this.CONSUME(Select);
 		this.SUBRULE(this.columnList);
 		this.CONSUME(From);
-		this.CONSUME(Identifier);
+		this.OR([
+			{ ALT: () => this.CONSUME(Identifier) },
+			{ ALT: () => this.CONSUME(StringLiteral) },
+		]);
 		this.OPTION(() => {
-			this.OR([
+			this.OR2([
 				{
 					ALT: () => {
 						this.CONSUME(As);

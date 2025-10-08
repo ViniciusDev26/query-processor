@@ -32,9 +32,6 @@ export function createASTBuilder(parser: SQLParser) {
 			if (!ctx.columnList) {
 				throw new Error("Missing columnList in selectStatement");
 			}
-			if (!ctx.Identifier) {
-				throw new Error("Missing Identifier in selectStatement");
-			}
 
 			const columnListNodes = ctx.columnList;
 			if (!isCstNodeArray(columnListNodes)) {
@@ -42,16 +39,31 @@ export function createASTBuilder(parser: SQLParser) {
 			}
 
 			const columns = this.visit(columnListNodes) as Column[];
-			const identifierTokens = ctx.Identifier as IToken[];
-			const tableName = identifierTokens[0].image;
+
+			// Table name can be either Identifier or StringLiteral
+			let tableName: string;
+			if (ctx.Identifier) {
+				const identifierTokens = ctx.Identifier as IToken[];
+				tableName = identifierTokens[0].image;
+			} else if (ctx.StringLiteral) {
+				const stringTokens = ctx.StringLiteral as IToken[];
+				const rawValue = stringTokens[0].image;
+				tableName = rawValue.slice(1, -1); // Remove quotes
+			} else {
+				throw new Error("Missing table name in selectStatement");
+			}
+
 			const from: FromClause = {
 				type: "FromClause",
 				table: tableName,
 			};
 
 			// Handle alias: either "AS alias" or implicit "alias"
-			if (identifierTokens.length > 1) {
-				from.alias = identifierTokens[1].image;
+			if (ctx.Identifier) {
+				const identifierTokens = ctx.Identifier as IToken[];
+				if (identifierTokens.length > 1) {
+					from.alias = identifierTokens[1].image;
+				}
 			}
 
 			const statement: SelectStatement = {
