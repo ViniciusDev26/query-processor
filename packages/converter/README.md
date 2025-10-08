@@ -7,9 +7,10 @@ SQL parser and converter to Abstract Syntax Tree (AST) and Relational Algebra.
 - ✅ **Lexical Analysis**: Tokenization with support for SQL keywords, operators, and literals
 - ✅ **Syntax Parsing**: Chevrotain-based parser generating Concrete Syntax Tree (CST)
 - ✅ **AST Generation**: Type-safe Abstract Syntax Tree conversion
+- ✅ **Schema Validation**: Validate queries against database schema with type checking
 - ✅ **Error Handling**: Custom SQLParseError with detailed error messages
 - ✅ **Type Safety**: Full TypeScript support with exported types
-- ✅ **Well Tested**: 70 comprehensive tests covering all features
+- ✅ **Well Tested**: 103 comprehensive tests covering all features
 
 ## Supported SQL Features
 
@@ -62,6 +63,58 @@ const ast = parseSQL('SELECT * FROM users WHERE age > 18');
 console.log(ast);
 ```
 
+### Schema Validation
+
+Validate SQL queries against a database schema before parsing:
+
+```typescript
+import { validateSQL, type DatabaseSchema, SchemaValidationError } from '@query-processor/converter';
+
+// Define your database schema
+const schema: DatabaseSchema = {
+  tables: {
+    users: {
+      columns: {
+        id: { type: 'INT', primaryKey: true },
+        name: { type: 'VARCHAR', length: 100 },
+        email: { type: 'VARCHAR', length: 255 },
+        age: { type: 'TINYINT' },
+        balance: { type: 'DECIMAL', precision: 10, scale: 2 },
+        is_active: { type: 'BOOLEAN' },
+        created_at: { type: 'DATETIME' }
+      }
+    }
+  }
+};
+
+// Validate SQL against schema
+try {
+  validateSQL('SELECT name, email FROM users WHERE age > 18', schema);
+  console.log('Query is valid!');
+} catch (error) {
+  if (error instanceof SchemaValidationError) {
+    console.error('Validation failed:', error.message);
+    console.error('Errors:', error.getDetails());
+  }
+}
+```
+
+**Supported column types:**
+- `INT` - Integer numbers
+- `TINYINT` - Small integer numbers (0-255)
+- `VARCHAR` - Variable-length strings (with optional `length` parameter)
+- `DECIMAL` - Decimal numbers (with optional `precision` and `scale` parameters)
+- `BOOLEAN` - Boolean values
+- `DATETIME` - Date and time values
+
+**Validation checks:**
+- ✅ Table existence (case-insensitive)
+- ✅ Column existence in specified tables (case-insensitive)
+- ✅ Type compatibility in comparisons (numeric, string, boolean, datetime)
+- ✅ Proper type matching between literals and columns
+
+**Note:** Table and column name validation is **case-insensitive**, following standard SQL behavior. This means `SELECT Name FROM Users` will match a schema with `name` and `users`.
+
 ### Error Handling
 
 ```typescript
@@ -106,6 +159,18 @@ Parses a SQL query string and returns an AST.
 **Throws:**
 - `SQLParseError`: If the input contains lexical or syntax errors
 
+#### `validateSQL(input: string, schema: DatabaseSchema): void`
+
+Validates a SQL query against a database schema.
+
+**Parameters:**
+- `input`: SQL query string to validate
+- `schema`: Database schema definition
+
+**Throws:**
+- `SQLParseError`: If the input contains lexical or syntax errors
+- `SchemaValidationError`: If the query violates schema constraints
+
 ### Types
 
 #### `Statement`
@@ -132,6 +197,42 @@ class SQLParseError extends Error {
   details: string;
   constructor(message: string, details: string);
 }
+```
+
+#### `SchemaValidationError`
+Custom error class for schema validation errors.
+
+```typescript
+class SchemaValidationError extends Error {
+  errors: ValidationError[];
+  getDetails(): ValidationError[];
+  hasErrorType(type: ValidationError["type"]): boolean;
+}
+```
+
+#### `DatabaseSchema`
+Database schema definition for validation.
+
+```typescript
+interface DatabaseSchema {
+  tables: Record<string, TableSchema>;
+}
+
+interface TableSchema {
+  columns: Record<string, ColumnDefinition>;
+}
+
+interface ColumnDefinition {
+  type: ColumnType;
+  length?: number;        // For VARCHAR (e.g., VARCHAR(255))
+  precision?: number;     // For DECIMAL (total digits, e.g., DECIMAL(10,2) -> precision: 10)
+  scale?: number;         // For DECIMAL (decimal places, e.g., DECIMAL(10,2) -> scale: 2)
+  nullable?: boolean;
+  primaryKey?: boolean;
+  unique?: boolean;
+}
+
+type ColumnType = "INT" | "TINYINT" | "VARCHAR" | "DATETIME" | "DECIMAL" | "BOOLEAN";
 ```
 
 ## Architecture
@@ -212,6 +313,10 @@ src/
 │   ├── SQLParser.ts       # Parser (CST generation)
 │   ├── ASTBuilder.ts      # CST to AST converter
 │   └── types.ts           # Parser type definitions
+├── validator/
+│   ├── SchemaValidator.ts # Schema validation logic
+│   ├── SchemaValidationError.ts # Validation error class
+│   └── types.ts           # Schema type definitions
 └── index.ts               # Public API
 ```
 
@@ -222,6 +327,7 @@ The package includes comprehensive tests:
 - **Lexer Tests**: Token recognition and error handling
 - **Parser Tests**: CST generation for various SQL structures
 - **AST Builder Tests**: AST conversion accuracy
+- **Schema Validation Tests**: Table, column, and type validation
 - **Integration Tests**: End-to-end parsing
 - **Error Handling Tests**: Lexer and parser error scenarios
 
