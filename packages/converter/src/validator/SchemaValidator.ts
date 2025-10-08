@@ -22,6 +22,7 @@ export class SchemaValidator {
 	private schema: DatabaseSchema;
 	private errors: ValidationError[] = [];
 	private currentTable?: string;
+	private availableTables: Map<string, string> = new Map(); // alias -> tableName
 
 	constructor(schema: DatabaseSchema) {
 		this.schema = schema;
@@ -33,6 +34,7 @@ export class SchemaValidator {
 	public validate(ast: SelectStatement): ValidationError[] {
 		this.errors = [];
 		this.currentTable = undefined;
+		this.availableTables.clear();
 
 		// Validate FROM clause
 		this.validateTable(ast.from.table);
@@ -43,6 +45,25 @@ export class SchemaValidator {
 		// Use the actual table name from schema (case-insensitive match)
 		const actualTableName = this.findTableName(ast.from.table);
 		this.currentTable = actualTableName || ast.from.table;
+
+		// Register FROM table with its alias
+		const fromAlias = ast.from.alias || this.currentTable;
+		this.availableTables.set(fromAlias.toLowerCase(), this.currentTable);
+
+		// Validate JOIN clauses
+		if (ast.joins) {
+			for (const join of ast.joins) {
+				this.validateTable(join.table);
+				const actualJoinTableName = this.findTableName(join.table);
+				if (actualJoinTableName) {
+					const joinAlias = join.alias || actualJoinTableName;
+					this.availableTables.set(joinAlias.toLowerCase(), actualJoinTableName);
+				}
+
+				// Validate ON condition
+				this.validateExpression(join.on);
+			}
+		}
 
 		// Validate columns
 		this.validateColumns(ast.columns);
@@ -191,30 +212,82 @@ export class SchemaValidator {
 
 	/**
 	 * Get the type of a column from the schema (case-insensitive)
+	 * Supports qualified column names (table.column or alias.column)
 	 */
 	private getColumnType(columnName: string): ColumnType | null {
-		if (!this.currentTable) return null;
+		// Check if it's a qualified column reference (table.column)
+		const parts = columnName.split(".");
+		let tableName: string;
+		let actualColumnName: string;
 
-		const actualTableName = this.findTableName(this.currentTable);
+		if (parts.length === 2) {
+			// Qualified reference: table.column or alias.column
+			const tableOrAlias = parts[0];
+			actualColumnName = parts[1];
+
+			// Try to find table by alias first
+			const resolvedTable = this.availableTables.get(tableOrAlias.toLowerCase());
+			if (!resolvedTable) {
+				this.errors.push({
+					type: "UNKNOWN_TABLE",
+					message: `Table or alias '${tableOrAlias}' does not exist`,
+					table: tableOrAlias,
+				});
+				return null;
+			}
+			tableName = resolvedTable;
+		} else {
+			// Unqualified reference: just column name
+			actualColumnName = columnName;
+
+			// If we have multiple tables (JOINs), we need to search in all
+			if (this.availableTables.size > 1) {
+				// Try to find the column in any of the available tables
+				for (const [, tblName] of this.availableTables) {
+					const actualTblName = this.findTableName(tblName);
+					if (!actualTblName) continue;
+
+					const table = this.schema.tables[actualTblName];
+					const foundColumn = this.findColumnName(table, actualColumnName);
+					if (foundColumn) {
+						return table.columns[foundColumn].type;
+					}
+				}
+
+				// Column not found in any table
+				this.errors.push({
+					type: "UNKNOWN_COLUMN",
+					message: `Column '${columnName}' is ambiguous or does not exist in any joined table`,
+					column: columnName,
+				});
+				return null;
+			}
+
+			// Single table case
+			if (!this.currentTable) return null;
+			tableName = this.currentTable;
+		}
+
+		const actualTableName = this.findTableName(tableName);
 		if (!actualTableName) return null;
 
 		const table = this.schema.tables[actualTableName];
-		const actualColumnName = this.findColumnName(table, columnName);
+		const foundColumnName = this.findColumnName(table, actualColumnName);
 
-		if (!actualColumnName) {
+		if (!foundColumnName) {
 			// Report unknown column if not already reported
-			if (!this.errors.some((err) => err.column === columnName)) {
+			if (!this.errors.some((err) => err.column === actualColumnName)) {
 				this.errors.push({
 					type: "UNKNOWN_COLUMN",
-					message: `Column '${columnName}' does not exist in table '${this.currentTable}'`,
-					table: this.currentTable,
-					column: columnName,
+					message: `Column '${actualColumnName}' does not exist in table '${tableName}'`,
+					table: tableName,
+					column: actualColumnName,
 				});
 			}
 			return null;
 		}
 
-		return table.columns[actualColumnName].type;
+		return table.columns[foundColumnName].type;
 	}
 
 	/**

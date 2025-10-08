@@ -6,6 +6,7 @@ import type {
 	ComparisonOperator,
 	Expression,
 	FromClause,
+	JoinClause,
 	LogicalExpression,
 	NamedColumn,
 	NumberLiteral,
@@ -72,6 +73,16 @@ export function createASTBuilder(parser: SQLParser) {
 				from,
 			};
 
+			// Handle joins
+			if (ctx.joinClause) {
+				const joinClauseNodes = ctx.joinClause;
+				if (isCstNodeArray(joinClauseNodes)) {
+					statement.joins = (joinClauseNodes as CstNode[]).map((node) =>
+						this.visit(node),
+					) as JoinClause[];
+				}
+			}
+
 			if (ctx.whereClause) {
 				const whereClauseNodes = ctx.whereClause;
 				if (isCstNodeArray(whereClauseNodes)) {
@@ -97,6 +108,50 @@ export function createASTBuilder(parser: SQLParser) {
 			}));
 
 			return columns;
+		}
+
+		joinClause(ctx: CstContext): JoinClause {
+			// Table name can be either Identifier or StringLiteral
+			let tableName: string;
+			if (ctx.Identifier) {
+				const identifierTokens = ctx.Identifier as IToken[];
+				tableName = identifierTokens[0].image;
+			} else if (ctx.StringLiteral) {
+				const stringTokens = ctx.StringLiteral as IToken[];
+				const rawValue = stringTokens[0].image;
+				tableName = rawValue.slice(1, -1); // Remove quotes
+			} else {
+				throw new Error("Missing table name in joinClause");
+			}
+
+			const join: JoinClause = {
+				type: "JoinClause",
+				joinType: "INNER",
+				table: tableName,
+				on: {} as Expression, // Will be set below
+			};
+
+			// Handle alias: either "AS alias" or implicit "alias"
+			if (ctx.Identifier) {
+				const identifierTokens = ctx.Identifier as IToken[];
+				if (identifierTokens.length > 1) {
+					join.alias = identifierTokens[1].image;
+				}
+			}
+
+			// Handle ON condition
+			if (!ctx.orExpression) {
+				throw new Error("Missing ON condition in joinClause");
+			}
+
+			const orExpressionNodes = ctx.orExpression;
+			if (!isCstNodeArray(orExpressionNodes)) {
+				throw new Error("orExpression is not a CstNode array");
+			}
+
+			join.on = this.visit(orExpressionNodes) as Expression;
+
+			return join;
 		}
 
 		whereClause(ctx: CstContext): WhereClause {
@@ -231,9 +286,16 @@ export function createASTBuilder(parser: SQLParser) {
 		operand(ctx: CstContext): Operand {
 			if (ctx.Identifier) {
 				const identifierTokens = ctx.Identifier as IToken[];
+				let columnName = identifierTokens[0].image;
+
+				// Check for qualified column reference (table.column)
+				if (identifierTokens.length > 1) {
+					columnName = `${identifierTokens[0].image}.${identifierTokens[1].image}`;
+				}
+
 				const columnRef: ColumnReference = {
 					type: "ColumnReference",
-					name: identifierTokens[0].image,
+					name: columnName,
 				};
 				return columnRef;
 			}

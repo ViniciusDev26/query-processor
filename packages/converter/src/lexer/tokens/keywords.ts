@@ -32,3 +32,18 @@ export const As = createToken({
 	pattern: /AS/i,
 	longer_alt: Identifier,
 });
+export const Join = createToken({
+	name: "Join",
+	pattern: /JOIN/i,
+	longer_alt: Identifier,
+});
+export const Inner = createToken({
+	name: "Inner",
+	pattern: /INNER/i,
+	longer_alt: Identifier,
+});
+export const On = createToken({
+	name: "On",
+	pattern: /ON/i,
+	longer_alt: Identifier,
+});

@@ -4,16 +4,20 @@ import {
 	And,
 	As,
 	Comma,
+	Dot,
 	Equals,
 	From,
 	GreaterThan,
 	GreaterThanOrEqual,
 	Identifier,
+	Inner,
+	Join,
 	LessThan,
 	LessThanOrEqual,
 	LParen,
 	NotEquals,
 	NumberLiteral,
+	On,
 	Or,
 	RParen,
 	Select,
@@ -28,7 +32,7 @@ export class SQLParser extends CstParser {
 		this.performSelfAnalysis();
 	}
 
-	// SELECT column1, column2, ... FROM table [AS alias] [WHERE condition]
+	// SELECT column1, column2, ... FROM table [AS alias] [JOIN ...] [WHERE condition]
 	public selectStatement = this.RULE("selectStatement", () => {
 		this.CONSUME(Select);
 		this.SUBRULE(this.columnList);
@@ -47,6 +51,9 @@ export class SQLParser extends CstParser {
 				},
 				{ ALT: () => this.CONSUME3(Identifier) },
 			]);
+		});
+		this.MANY(() => {
+			this.SUBRULE(this.joinClause);
 		});
 		this.OPTION2(() => {
 			this.SUBRULE(this.whereClause);
@@ -71,6 +78,31 @@ export class SQLParser extends CstParser {
 				},
 			},
 		]);
+	});
+
+	// [INNER] JOIN table [AS alias] ON condition
+	private joinClause = this.RULE("joinClause", () => {
+		this.OPTION(() => {
+			this.CONSUME(Inner);
+		});
+		this.CONSUME(Join);
+		this.OR([
+			{ ALT: () => this.CONSUME(Identifier) },
+			{ ALT: () => this.CONSUME(StringLiteral) },
+		]);
+		this.OPTION2(() => {
+			this.OR2([
+				{
+					ALT: () => {
+						this.CONSUME(As);
+						this.CONSUME2(Identifier);
+					},
+				},
+				{ ALT: () => this.CONSUME3(Identifier) },
+			]);
+		});
+		this.CONSUME(On);
+		this.SUBRULE(this.orExpression);
 	});
 
 	// WHERE condition
@@ -130,10 +162,18 @@ export class SQLParser extends CstParser {
 		]);
 	});
 
-	// identifier | number | string
+	// identifier | table.column | number | string
 	private operand = this.RULE("operand", () => {
 		this.OR([
-			{ ALT: () => this.CONSUME(Identifier) },
+			{
+				ALT: () => {
+					this.CONSUME(Identifier);
+					this.OPTION(() => {
+						this.CONSUME(Dot);
+						this.CONSUME2(Identifier);
+					});
+				},
+			},
 			{ ALT: () => this.CONSUME(NumberLiteral) },
 			{ ALT: () => this.CONSUME(StringLiteral) },
 		]);

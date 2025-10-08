@@ -313,4 +313,79 @@ describe("SchemaValidator", () => {
 			}
 		});
 	});
+
+	describe("JOIN support", () => {
+		it("should parse and validate INNER JOIN", () => {
+			const ast = parse(
+				"SELECT * FROM users INNER JOIN products ON users.id = products.id",
+			);
+			expect(ast.joins).toBeDefined();
+			expect(ast.joins).toHaveLength(1);
+			expect(ast.joins?.[0].joinType).toBe("INNER");
+			expect(ast.joins?.[0].table).toBe("products");
+		});
+
+		it("should parse and validate JOIN (implicit INNER)", () => {
+			const ast = parse(
+				"SELECT * FROM users JOIN products ON users.id = products.id",
+			);
+			expect(ast.joins).toBeDefined();
+			expect(ast.joins).toHaveLength(1);
+			expect(ast.joins?.[0].joinType).toBe("INNER");
+		});
+
+		it("should validate JOIN with table aliases", () => {
+			const ast = parse(
+				"SELECT * FROM users u JOIN products p ON u.id = p.id",
+			);
+			const errors = validator.validate(ast);
+			expect(errors).toHaveLength(0);
+		});
+
+		it("should validate JOIN with qualified column names", () => {
+			const ast = parse(
+				"SELECT * FROM users JOIN products ON users.id = products.id",
+			);
+			const errors = validator.validate(ast);
+			expect(errors).toHaveLength(0);
+		});
+
+		it("should reject JOIN with non-existent table", () => {
+			const ast = parse(
+				"SELECT * FROM users JOIN nonexistent ON users.id = nonexistent.id",
+			);
+			const errors = validator.validate(ast);
+			expect(errors.length).toBeGreaterThan(0);
+			expect(errors.some((e) => e.type === "UNKNOWN_TABLE")).toBe(true);
+		});
+
+		it("should reject JOIN with invalid column in ON clause", () => {
+			const ast = parse(
+				"SELECT * FROM users JOIN products ON users.invalid = products.id",
+			);
+			const errors = validator.validate(ast);
+			expect(errors.length).toBeGreaterThan(0);
+			expect(errors.some((e) => e.type === "UNKNOWN_COLUMN")).toBe(true);
+		});
+
+		it("should support multiple JOINs", () => {
+			// First add a third table to schema for this test
+			schema.tables.orders = {
+				columns: {
+					id: { type: "INT", primaryKey: true },
+					user_id: { type: "INT" },
+					product_id: { type: "INT" },
+				},
+			};
+			validator = new SchemaValidator(schema);
+
+			const ast = parse(
+				"SELECT * FROM users u JOIN orders o ON u.id = o.user_id JOIN products p ON o.product_id = p.id",
+			);
+			expect(ast.joins).toHaveLength(2);
+
+			const errors = validator.validate(ast);
+			expect(errors).toHaveLength(0);
+		});
+	});
 });

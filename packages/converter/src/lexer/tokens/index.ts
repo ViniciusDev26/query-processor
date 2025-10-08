@@ -6,6 +6,7 @@ export * from "./keywords";
 import { Identifier, NumberLiteral, StringLiteral, WhiteSpace } from "./literals";
 import {
 	Comma,
+	Dot,
 	Equals,
 	GreaterThan,
 	GreaterThanOrEqual,
@@ -16,7 +17,7 @@ import {
 	RParen,
 	Star,
 } from "./operators";
-import { And, As, From, Or, Select, Where } from "./keywords";
+import { And, As, From, Inner, Join, On, Or, Select, Where } from "./keywords";
 
 // Token order matters! Keywords must come before Identifier
 // Comparison operators with multiple characters must come before single characters
@@ -29,6 +30,9 @@ export const allTokens = [
 	And,
 	Or,
 	As,
+	Join,
+	Inner,
+	On,
 	// Literals
 	NumberLiteral,
 	StringLiteral,
@@ -45,4 +49,5 @@ export const allTokens = [
 	Comma,
 	LParen,
 	RParen,
+	Dot,
 ];

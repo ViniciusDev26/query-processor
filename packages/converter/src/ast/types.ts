@@ -11,6 +11,7 @@ export interface SelectStatement {
 	type: "SelectStatement";
 	columns: Column[];
 	from: FromClause;
+	joins?: JoinClause[];
 	where?: WhereClause;
 }
 
@@ -55,6 +56,14 @@ export interface FromClause {
 	type: "FromClause";
 	table: string;
 	alias?: string;
+}
+
+export interface JoinClause {
+	type: "JoinClause";
+	joinType: "INNER";
+	table: string;
+	alias?: string;
+	on: Expression;
 }
 
 export interface WhereClause {
@@ -111,6 +120,7 @@ export type ASTNode =
 	| Statement
 	| Column
 	| FromClause
+	| JoinClause
 	| WhereClause
 	| Expression
 	| Operand
