@@ -72,7 +72,7 @@ export class SQLParser extends CstParser {
 		]);
 	});
 
-	// column1, column2, ... | *
+	// column1, column2, ... | * | table.column
 	private columnList = this.RULE("columnList", () => {
 		this.OR([
 			{
@@ -82,14 +82,23 @@ export class SQLParser extends CstParser {
 			},
 			{
 				ALT: () => {
-					this.CONSUME(Identifier);
+					this.SUBRULE(this.columnReference);
 					this.MANY(() => {
 						this.CONSUME(Comma);
-						this.CONSUME2(Identifier);
+						this.SUBRULE2(this.columnReference);
 					});
 				},
 			},
 		]);
+	});
+
+	// column | table.column
+	private columnReference = this.RULE("columnReference", () => {
+		this.CONSUME(Identifier);
+		this.OPTION(() => {
+			this.CONSUME(Dot);
+			this.CONSUME2(Identifier);
+		});
 	});
 
 	// [INNER] JOIN table [AS alias] ON condition

@@ -135,13 +135,28 @@ export function createASTBuilder(parser: SQLParser) {
 				return [starColumn];
 			}
 
-			const identifierTokens = ctx.Identifier as IToken[];
-			const columns: NamedColumn[] = identifierTokens.map((token: IToken) => ({
-				type: "NamedColumn" as const,
-				name: token.image,
-			}));
+			// Process column references (which may be qualified)
+			if (ctx.columnReference) {
+				const columnRefNodes = ctx.columnReference as CstNode[];
+				return columnRefNodes.map((node) => this.visit(node) as Column);
+			}
 
-			return columns;
+			throw new Error("Unknown column list format");
+		}
+
+		columnReference(ctx: CstContext): NamedColumn {
+			const identifierTokens = ctx.Identifier as IToken[];
+			let columnName = identifierTokens[0].image;
+
+			// Check for qualified column reference (table.column)
+			if (identifierTokens.length > 1) {
+				columnName = `${identifierTokens[0].image}.${identifierTokens[1].image}`;
+			}
+
+			return {
+				type: "NamedColumn",
+				name: columnName,
+			};
 		}
 
 		joinClause(ctx: CstContext): JoinClause {

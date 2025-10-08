@@ -176,4 +176,37 @@ describe("parseSQL", () => {
 			}
 		}
 	});
+
+	it("should parse SELECT with qualified column names", () => {
+		const result = parseSQL("SELECT p.idPedido FROM pedido AS p");
+		expect(result.success).toBe(true);
+		if (result.success) {
+			const ast = result.ast as SelectStatement;
+			expect(ast.columns).toHaveLength(1);
+			expect((ast.columns[0] as NamedColumn).name).toBe("p.idPedido");
+			expect(ast.from.alias).toBe("p");
+		}
+	});
+
+	it("should parse SELECT with multiple qualified columns", () => {
+		const result = parseSQL("SELECT u.id, u.name FROM users AS u");
+		expect(result.success).toBe(true);
+		if (result.success) {
+			const ast = result.ast as SelectStatement;
+			expect(ast.columns).toHaveLength(2);
+			expect((ast.columns[0] as NamedColumn).name).toBe("u.id");
+			expect((ast.columns[1] as NamedColumn).name).toBe("u.name");
+		}
+	});
+
+	it("should parse SELECT with mixed qualified and unqualified columns", () => {
+		const result = parseSQL("SELECT id, u.name FROM users AS u");
+		expect(result.success).toBe(true);
+		if (result.success) {
+			const ast = result.ast as SelectStatement;
+			expect(ast.columns).toHaveLength(2);
+			expect((ast.columns[0] as NamedColumn).name).toBe("id");
+			expect((ast.columns[1] as NamedColumn).name).toBe("u.name");
+		}
+	});
 });
