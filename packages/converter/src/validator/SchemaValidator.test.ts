@@ -314,6 +314,54 @@ describe("SchemaValidator", () => {
 		});
 	});
 
+	describe("Qualified column names", () => {
+		it("should validate qualified column in SELECT with alias", () => {
+			const ast = parse("SELECT u.name FROM users AS u");
+			const errors = validator.validate(ast);
+			expect(errors).toHaveLength(0);
+		});
+
+		it("should validate qualified column in SELECT without AS", () => {
+			const ast = parse("SELECT u.name FROM users u");
+			const errors = validator.validate(ast);
+			expect(errors).toHaveLength(0);
+		});
+
+		it("should validate multiple qualified columns", () => {
+			const ast = parse("SELECT u.id, u.name, u.email FROM users AS u");
+			const errors = validator.validate(ast);
+			expect(errors).toHaveLength(0);
+		});
+
+		it("should validate mixed qualified and unqualified columns", () => {
+			const ast = parse("SELECT id, u.name FROM users AS u");
+			const errors = validator.validate(ast);
+			expect(errors).toHaveLength(0);
+		});
+
+		it("should reject qualified column with invalid alias", () => {
+			const ast = parse("SELECT x.name FROM users AS u");
+			const errors = validator.validate(ast);
+			expect(errors).toHaveLength(1);
+			expect(errors[0].type).toBe("UNKNOWN_TABLE");
+			expect(errors[0].message).toContain("x");
+		});
+
+		it("should reject qualified column with invalid column name", () => {
+			const ast = parse("SELECT u.invalid FROM users AS u");
+			const errors = validator.validate(ast);
+			expect(errors).toHaveLength(1);
+			expect(errors[0].type).toBe("UNKNOWN_COLUMN");
+			expect(errors[0].column).toBe("invalid");
+		});
+
+		it("should validate qualified columns in WHERE with alias", () => {
+			const ast = parse("SELECT * FROM users AS u WHERE u.age > 18");
+			const errors = validator.validate(ast);
+			expect(errors).toHaveLength(0);
+		});
+	});
+
 	describe("JOIN support", () => {
 		it("should parse and validate INNER JOIN", () => {
 			const ast = parse(

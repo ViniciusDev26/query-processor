@@ -141,22 +141,89 @@ export class SchemaValidator {
 
 	/**
 	 * Validate that a column exists in the current table (case-insensitive)
+	 * Supports qualified column names (table.column or alias.column)
 	 */
 	private validateColumnExists(column: NamedColumn): void {
-		if (!this.currentTable) return;
+		// Check if it's a qualified column reference (table.column)
+		const parts = column.name.split(".");
+		let tableName: string;
+		let actualColumnName: string;
 
-		const actualTableName = this.findTableName(this.currentTable);
+		if (parts.length === 2) {
+			// Qualified reference: table.column or alias.column
+			const tableOrAlias = parts[0];
+			actualColumnName = parts[1];
+
+			// Try to find table by alias first
+			const resolvedTable = this.availableTables.get(tableOrAlias.toLowerCase());
+			if (!resolvedTable) {
+				this.errors.push({
+					type: "UNKNOWN_TABLE",
+					message: `Table or alias '${tableOrAlias}' does not exist`,
+					table: tableOrAlias,
+				});
+				return;
+			}
+			tableName = resolvedTable;
+		} else {
+			// Unqualified reference: just column name
+			actualColumnName = column.name;
+
+			// If we have multiple tables (JOINs), column reference is ambiguous
+			if (this.availableTables.size > 1) {
+				// Try to find the column in any of the available tables
+				let foundInTables: string[] = [];
+				for (const [, tblName] of this.availableTables) {
+					const actualTblName = this.findTableName(tblName);
+					if (!actualTblName) continue;
+
+					const table = this.schema.tables[actualTblName];
+					const foundColumn = this.findColumnName(table, actualColumnName);
+					if (foundColumn) {
+						foundInTables.push(actualTblName);
+					}
+				}
+
+				if (foundInTables.length === 0) {
+					this.errors.push({
+						type: "UNKNOWN_COLUMN",
+						message: `Column '${column.name}' does not exist in any joined table`,
+						column: column.name,
+					});
+					return;
+				}
+
+				if (foundInTables.length > 1) {
+					this.errors.push({
+						type: "INVALID_COMPARISON",
+						message: `Column '${column.name}' is ambiguous (found in tables: ${foundInTables.join(", ")})`,
+						column: column.name,
+					});
+					return;
+				}
+
+				// Found in exactly one table - OK
+				return;
+			}
+
+			// Single table case
+			if (!this.currentTable) return;
+			tableName = this.currentTable;
+		}
+
+		// Validate the column exists in the resolved table
+		const actualTableName = this.findTableName(tableName);
 		if (!actualTableName) return;
 
 		const table = this.schema.tables[actualTableName];
-		const actualColumnName = this.findColumnName(table, column.name);
+		const foundColumnName = this.findColumnName(table, actualColumnName);
 
-		if (!actualColumnName) {
+		if (!foundColumnName) {
 			this.errors.push({
 				type: "UNKNOWN_COLUMN",
-				message: `Column '${column.name}' does not exist in table '${this.currentTable}'`,
-				table: this.currentTable,
-				column: column.name,
+				message: `Column '${actualColumnName}' does not exist in table '${tableName}'`,
+				table: tableName,
+				column: actualColumnName,
 			});
 		}
 	}
