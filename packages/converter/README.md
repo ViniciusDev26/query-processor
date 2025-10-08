@@ -88,14 +88,13 @@ const schema: DatabaseSchema = {
 };
 
 // Validate SQL against schema
-try {
-  validateSQL('SELECT name, email FROM users WHERE age > 18', schema);
+const errors = validateSQL('SELECT name, email FROM users WHERE age > 18', schema);
+
+if (errors.length === 0) {
   console.log('Query is valid!');
-} catch (error) {
-  if (error instanceof SchemaValidationError) {
-    console.error('Validation failed:', error.message);
-    console.error('Errors:', error.getDetails());
-  }
+} else {
+  console.error('Validation failed:');
+  errors.forEach(err => console.error(`  - ${err.message}`));
 }
 ```
 
@@ -159,7 +158,7 @@ Parses a SQL query string and returns an AST.
 **Throws:**
 - `SQLParseError`: If the input contains lexical or syntax errors
 
-#### `validateSQL(input: string, schema: DatabaseSchema): void`
+#### `validateSQL(input: string, schema: DatabaseSchema): ValidationError[]`
 
 Validates a SQL query against a database schema.
 
@@ -167,9 +166,11 @@ Validates a SQL query against a database schema.
 - `input`: SQL query string to validate
 - `schema`: Database schema definition
 
+**Returns:**
+- `ValidationError[]`: Array of validation errors (empty if valid)
+
 **Throws:**
 - `SQLParseError`: If the input contains lexical or syntax errors
-- `SchemaValidationError`: If the query violates schema constraints
 
 ### Types
 
