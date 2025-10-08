@@ -144,18 +144,18 @@ export function createASTBuilder(parser: SQLParser) {
 		}
 
 		andExpression(ctx: CstContext): Expression {
-			if (!ctx.comparisonExpression) {
-				throw new Error("Missing comparisonExpression in andExpression");
+			if (!ctx.primaryExpression) {
+				throw new Error("Missing primaryExpression in andExpression");
 			}
 
-			const comparisonExpressions = ctx.comparisonExpression as CstNode[];
-			let left: Expression = this.visit(comparisonExpressions[0]) as Expression;
+			const primaryExpressions = ctx.primaryExpression as CstNode[];
+			let left: Expression = this.visit(primaryExpressions[0]) as Expression;
 
 			if (ctx.And) {
 				const andTokens = ctx.And as IToken[];
 				for (let i = 0; i < andTokens.length; i++) {
 					const right: Expression = this.visit(
-						comparisonExpressions[i + 1],
+						primaryExpressions[i + 1],
 					) as Expression;
 					const logicalExpr: LogicalExpression = {
 						type: "LogicalExpression",
@@ -168,6 +168,28 @@ export function createASTBuilder(parser: SQLParser) {
 			}
 
 			return left;
+		}
+
+		primaryExpression(ctx: CstContext): Expression {
+			// If it's a parenthesized expression
+			if (ctx.orExpression) {
+				const orExpressionNodes = ctx.orExpression;
+				if (!isCstNodeArray(orExpressionNodes)) {
+					throw new Error("orExpression is not a CstNode array");
+				}
+				return this.visit(orExpressionNodes) as Expression;
+			}
+
+			// Otherwise it's a comparison expression
+			if (ctx.comparisonExpression) {
+				const comparisonExpressionNodes = ctx.comparisonExpression;
+				if (!isCstNodeArray(comparisonExpressionNodes)) {
+					throw new Error("comparisonExpression is not a CstNode array");
+				}
+				return this.visit(comparisonExpressionNodes) as Expression;
+			}
+
+			throw new Error("Unknown primary expression type");
 		}
 
 		comparisonExpression(ctx: CstContext): BinaryExpression {

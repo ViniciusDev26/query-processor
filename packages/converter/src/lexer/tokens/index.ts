@@ -11,7 +11,9 @@ import {
 	GreaterThanOrEqual,
 	LessThan,
 	LessThanOrEqual,
+	LParen,
 	NotEquals,
+	RParen,
 	Star,
 } from "./operators";
 import { And, As, From, Or, Select, Where } from "./keywords";
@@ -41,4 +43,6 @@ export const allTokens = [
 	GreaterThan,
 	Star,
 	Comma,
+	LParen,
+	RParen,
 ];

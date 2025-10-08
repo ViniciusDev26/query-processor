@@ -162,4 +162,56 @@ describe("SQLParser", () => {
 
 		expect(errors.length).toBeGreaterThan(0);
 	});
+
+	it("should parse WHERE with parenthesized expression", () => {
+		const { cst, errors } = parse(
+			"SELECT * FROM users WHERE (age > 18)",
+		);
+
+		expect(errors).toHaveLength(0);
+		expect(cst).toBeDefined();
+	});
+
+	it("should parse WHERE with complex parenthesized expressions", () => {
+		const { cst, errors } = parse(
+			"SELECT * FROM users WHERE (age > 18 AND status = 'active') OR role = 'admin'",
+		);
+
+		expect(errors).toHaveLength(0);
+		expect(cst).toBeDefined();
+	});
+
+	it("should parse WHERE with nested parentheses", () => {
+		const { cst, errors } = parse(
+			"SELECT * FROM users WHERE ((age > 18 AND age < 65) OR role = 'admin') AND status = 'active'",
+		);
+
+		expect(errors).toHaveLength(0);
+		expect(cst).toBeDefined();
+	});
+
+	it("should parse WHERE with multiple parenthesized groups", () => {
+		const { cst, errors } = parse(
+			"SELECT * FROM users WHERE (age > 18 OR age < 10) AND (status = 'active' OR status = 'pending')",
+		);
+
+		expect(errors).toHaveLength(0);
+		expect(cst).toBeDefined();
+	});
+
+	it("should fail on unmatched opening parenthesis", () => {
+		const { errors } = parse(
+			"SELECT * FROM users WHERE (age > 18",
+		);
+
+		expect(errors.length).toBeGreaterThan(0);
+	});
+
+	it("should fail on unmatched closing parenthesis", () => {
+		const { errors } = parse(
+			"SELECT * FROM users WHERE age > 18)",
+		);
+
+		expect(errors.length).toBeGreaterThan(0);
+	});
 });

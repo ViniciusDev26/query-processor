@@ -11,9 +11,11 @@ import {
 	Identifier,
 	LessThan,
 	LessThanOrEqual,
+	LParen,
 	NotEquals,
 	NumberLiteral,
 	Or,
+	RParen,
 	Select,
 	Star,
 	StringLiteral,
@@ -88,11 +90,25 @@ export class SQLParser extends CstParser {
 
 	// expression AND expression
 	private andExpression = this.RULE("andExpression", () => {
-		this.SUBRULE(this.comparisonExpression);
+		this.SUBRULE(this.primaryExpression);
 		this.MANY(() => {
 			this.CONSUME(And);
-			this.SUBRULE2(this.comparisonExpression);
+			this.SUBRULE2(this.primaryExpression);
 		});
+	});
+
+	// ( expression ) | comparisonExpression
+	private primaryExpression = this.RULE("primaryExpression", () => {
+		this.OR([
+			{
+				ALT: () => {
+					this.CONSUME(LParen);
+					this.SUBRULE(this.orExpression);
+					this.CONSUME(RParen);
+				},
+			},
+			{ ALT: () => this.SUBRULE(this.comparisonExpression) },
+		]);
 	});
 
 	// operand operator operand

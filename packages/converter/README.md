@@ -29,11 +29,16 @@ SELECT * FROM users WHERE name = "John Doe"
 -- Logical operators
 SELECT * FROM users WHERE age >= 18 AND status = 'active'
 SELECT * FROM users WHERE age < 18 OR age > 65
+
+-- Parenthesized expressions
+SELECT * FROM users WHERE (age > 18 AND status = 'active') OR role = 'admin'
+SELECT * FROM users WHERE ((age > 18 AND age < 65) OR role = 'admin') AND status = 'active'
 ```
 
 ### Supported Operators
 - Comparison: `=`, `!=`, `<>`, `<`, `>`, `<=`, `>=`
 - Logical: `AND`, `OR`
+- Grouping: `( )` for parenthesized expressions
 
 ### Supported Data Types
 - Numbers: `42`, `3.14`
@@ -140,6 +145,37 @@ The converter follows a three-stage pipeline:
 ```
 SQL Input → Lexer → Tokens → Parser → CST → AST Builder → AST
 ```
+
+### Operator Precedence
+
+The parser implements proper operator precedence for logical operators:
+
+```
+whereClause
+    └── orExpression        (OR - lowest precedence)
+        └── andExpression   (AND - higher precedence)
+            └── primaryExpression
+                └── comparisonExpression (=, !=, <, >, etc. - highest precedence)
+```
+
+**Key Rules:**
+
+1. **AND has higher precedence than OR**
+   - `age > 18 AND status = 'active' OR role = 'admin'`
+   - Evaluated as: `(age > 18 AND status = 'active') OR (role = 'admin')`
+
+2. **Parentheses override precedence**
+   - `age > 18 AND (status = 'active' OR role = 'admin')`
+   - OR is evaluated first due to parentheses
+
+3. **Comparison operators have highest precedence**
+   - Always evaluated before logical operators
+
+**Grammar Hierarchy:**
+
+- `whereClause` starts with `orExpression` (lowest precedence operator)
+- Each level consumes the next higher precedence level
+- This naturally creates left-to-right grouping with proper precedence
 
 ## Development
 
