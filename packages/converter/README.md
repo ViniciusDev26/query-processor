@@ -141,6 +141,34 @@ console.log('Columns:', ast.columns); // Array of column identifiers
 console.log('Table:', ast.from); // 'users'
 ```
 
+### AST to Mermaid Visualization
+
+Convert AST to Mermaid diagram syntax for visual representation:
+
+```typescript
+import { parseSQL, astToMermaidMarkdown } from '@query-processor/converter';
+
+const result = parseSQL('SELECT * FROM users WHERE age > 18');
+
+if (result.success) {
+  const mermaidDiagram = astToMermaidMarkdown(result.ast);
+  console.log(mermaidDiagram);
+  // Outputs markdown with mermaid code block:
+  // ```mermaid
+  // graph TD
+  //   node0(["SELECT"])
+  //   node1(("*"))
+  //   ...
+  // ```
+}
+```
+
+The Mermaid translator generates flowchart diagrams that visualize the AST structure, showing:
+- Statement nodes (SELECT, FROM, WHERE, JOIN)
+- Column references and literals
+- Expression trees with operators
+- Parent-child relationships between nodes
+
 ## API Reference
 
 ### Functions
@@ -171,6 +199,16 @@ Validates a SQL query against a database schema.
 
 **Throws:**
 - `SQLParseError`: If the input contains lexical or syntax errors
+
+#### `astToMermaidMarkdown(ast: Statement): string`
+
+Converts an AST to Mermaid diagram syntax wrapped in a markdown code block.
+
+**Parameters:**
+- `ast`: Statement AST to visualize
+
+**Returns:**
+- `string`: Mermaid diagram code wrapped in markdown code fence
 
 ### Types
 
@@ -238,14 +276,21 @@ type ColumnType = "INT" | "TINYINT" | "VARCHAR" | "DATETIME" | "DECIMAL" | "BOOL
 
 ## Architecture
 
-The converter follows a three-stage pipeline:
+The converter follows a multi-stage pipeline:
 
 1. **Lexer** (`SQLLexer`): Tokenizes input string into tokens
 2. **Parser** (`SQLParser`): Generates CST from tokens using Chevrotain
 3. **AST Builder** (`ASTBuilder`): Converts CST to type-safe AST
+4. **Translators**: Transform AST into different representations
+   - **ASTToAlgebraTranslator**: Converts AST to Relational Algebra notation
+   - **ASTToMermaidTranslator**: Converts AST to Mermaid diagram syntax
 
 ```
 SQL Input → Lexer → Tokens → Parser → CST → AST Builder → AST
+                                                            ↓
+                                              ┌─────────────┴─────────────┐
+                                              ↓                           ↓
+                                    Relational Algebra          Mermaid Diagram
 ```
 
 ### Operator Precedence
@@ -314,6 +359,11 @@ src/
 │   ├── SQLParser.ts       # Parser (CST generation)
 │   ├── ASTBuilder.ts      # CST to AST converter
 │   └── types.ts           # Parser type definitions
+├── translator/
+│   ├── ASTToAlgebraTranslator.ts  # AST to Relational Algebra
+│   ├── ASTToMermaidTranslator.ts  # AST to Mermaid diagram
+│   ├── types.ts           # Translator type definitions
+│   └── index.ts           # Translator exports
 ├── validator/
 │   ├── SchemaValidator.ts # Schema validation logic
 │   ├── SchemaValidationError.ts # Validation error class

@@ -15,7 +15,10 @@
 	},
 	"scripts": {
 		"build": "tsc",
-		"test": "vitest run",
+		"test": "vitest run src",
+		"test:e2e": "vitest run tests/e2e",
+		"test:unit": "vitest run src",
+		"test:all": "vitest run",
 		"test:watch": "vitest",
 		"prepublishOnly": "npm run build"
 	},

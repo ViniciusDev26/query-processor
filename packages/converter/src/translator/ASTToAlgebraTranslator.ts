@@ -114,21 +114,17 @@ export class ASTToAlgebraTranslator {
 		let result = base;
 
 		for (const join of joins) {
-			// For INNER JOIN, we create a Cross Product followed by Selection
-			// JOIN users ON condition becomes: σ[condition](base × users)
-
 			// Build the condition string for the JOIN
 			const condition = this.buildConditionString(join.on);
 
-			// Apply cross product (represented as a nested relation in the selection)
-			// In real algebra, this would be: σ[condition](base × joinRelation)
-			// We'll represent it as a Selection with a special cross-product input
+			// Create a Join node with left (current result) and right (join table)
 			result = {
-				type: "Selection",
+				type: "Join",
 				condition,
-				input: {
+				left: result,
+				right: {
 					type: "Relation",
-					name: `(${this.nodeToString(result)} × ${join.table})`,
+					name: join.table,
 				},
 			};
 		}
@@ -150,6 +146,10 @@ export class ASTToAlgebraTranslator {
 		} else if (node.type === "Projection") {
 			const attrs = node.attributes.join(", ");
 			return `π[${attrs}](${this.nodeToString(node.input)})`;
+		} else if (node.type === "Join") {
+			return `⨝[${node.condition}](${this.nodeToString(node.left)}, ${this.nodeToString(node.right)})`;
+		} else if (node.type === "CrossProduct") {
+			return `(${this.nodeToString(node.left)} × ${this.nodeToString(node.right)})`;
 		}
 		return "unknown";
 	}
