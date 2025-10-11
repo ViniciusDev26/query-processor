@@ -165,94 +165,22 @@ export function pushDownProjections(
 			};
 		}
 
-		// Rule: π[attrs](R ⨝[cond] S) → introduce projections on both sides
-		// Push projection through join to reduce attributes before join
-		if (input.type === "Join" || input.type === "CrossProduct") {
-			const binary =
-				input.type === "Join" ? (input as Join) : (input as CrossProduct);
+		// Rule: π[attrs](R ⨝[cond] S) → push projections through join
+		// Delegate to optimizeJoin with needed attributes
+		if (input.type === "Join") {
+			const join = input as Join;
 
 			// Get attributes needed from projection
 			const projectionAttrs = extractAttributeNames(node.attributes);
 
-			// Get attributes needed for join condition
-			const joinAttrs =
-				input.type === "Join"
-					? extractAttributesFromCondition((binary as Join).condition)
-					: new Set<string>();
-
-			// Combine: we need projection attrs + join condition attrs
-			const neededAttrs = new Set([...projectionAttrs, ...joinAttrs]);
-
-			// Get relation names from each side
-			const leftRelations = getRelationNames(binary.left);
-			const rightRelations = getRelationNames(binary.right);
-
-			// Determine which attributes belong to which side
-			const leftAttrs: string[] = [];
-			const rightAttrs: string[] = [];
-
-			for (const attr of neededAttrs) {
-				const belongsToLeft = attributeBelongsToSide(attr, leftRelations);
-				const belongsToRight = attributeBelongsToSide(attr, rightRelations);
-
-				if (belongsToLeft) {
-					leftAttrs.push(attr);
-				}
-				if (belongsToRight) {
-					rightAttrs.push(attr);
-				}
-			}
-
-			// Only push down if we can reduce attributes on at least one side
-			if (leftAttrs.length > 0 || rightAttrs.length > 0) {
+			// Skip if it's a wildcard projection
+			if (!node.attributes.includes("*")) {
 				appliedRules.push(
 					`Push projection through join: π[${node.attributes.join(", ")}] before join`,
 				);
 
-				// Create projections on each side (if they reduce attributes)
-				let optimizedLeft = optimize(binary.left);
-				let optimizedRight = optimize(binary.right);
-
-				// Only add projection if it would actually reduce attributes
-				// (i.e., we're not projecting all attributes with *)
-				if (
-					leftAttrs.length > 0 &&
-					!node.attributes.includes("*") &&
-					leftAttrs.length < 100
-				) {
-					// Arbitrary limit to avoid projecting everything
-					optimizedLeft = {
-						type: "Projection",
-						attributes: leftAttrs,
-						input: optimizedLeft,
-					};
-				}
-
-				if (
-					rightAttrs.length > 0 &&
-					!node.attributes.includes("*") &&
-					rightAttrs.length < 100
-				) {
-					optimizedRight = {
-						type: "Projection",
-						attributes: rightAttrs,
-						input: optimizedRight,
-					};
-				}
-
-				const optimizedJoin: Join | CrossProduct =
-					input.type === "Join"
-						? {
-								type: "Join",
-								condition: (binary as Join).condition,
-								left: optimizedLeft,
-								right: optimizedRight,
-							}
-						: {
-								type: "CrossProduct",
-								left: optimizedLeft,
-								right: optimizedRight,
-							};
+				// Optimize the join with the needed attributes
+				const optimizedJoin = optimizeJoin(join, projectionAttrs);
 
 				// Keep the outer projection to maintain the correct attribute order
 				return {
@@ -261,6 +189,24 @@ export function pushDownProjections(
 					input: optimizedJoin,
 				};
 			}
+		}
+
+		if (input.type === "CrossProduct") {
+			const crossProduct = input as CrossProduct;
+
+			// For cross products, just optimize recursively
+			const optimizedLeft = optimize(crossProduct.left);
+			const optimizedRight = optimize(crossProduct.right);
+
+			return {
+				type: "Projection",
+				attributes: node.attributes,
+				input: {
+					type: "CrossProduct",
+					left: optimizedLeft,
+					right: optimizedRight,
+				},
+			};
 		}
 
 		// For other cases, recursively optimize the input
@@ -289,11 +235,85 @@ export function pushDownProjections(
 
 	/**
 	 * Optimize join nodes
+	 *
+	 * When optimizing joins, we need to introduce projections on each side
+	 * to keep only the attributes needed for this join and any parent operations
 	 */
-	function optimizeJoin(node: Join): RelationalAlgebraNode {
-		// Recursively optimize both sides of the join
-		const optimizedLeft = optimize(node.left);
-		const optimizedRight = optimize(node.right);
+	function optimizeJoin(node: Join, neededAttrs?: Set<string>): RelationalAlgebraNode {
+		// Get attributes needed for the join condition
+		const joinAttrs = extractAttributesFromCondition(node.condition);
+
+		// If parent specified needed attributes, combine with join attributes
+		const allNeededAttrs = neededAttrs
+			? new Set([...neededAttrs, ...joinAttrs])
+			: joinAttrs;
+
+		// Get relation names from each side
+		const leftRelations = getRelationNames(node.left);
+		const rightRelations = getRelationNames(node.right);
+
+		// Determine which attributes belong to which side
+		const leftAttrs: string[] = [];
+		const rightAttrs: string[] = [];
+
+		for (const attr of allNeededAttrs) {
+			const belongsToLeft = attributeBelongsToSide(attr, leftRelations);
+			const belongsToRight = attributeBelongsToSide(attr, rightRelations);
+
+			if (belongsToLeft) {
+				leftAttrs.push(attr);
+			}
+			if (belongsToRight) {
+				rightAttrs.push(attr);
+			}
+		}
+
+		// Recursively optimize both sides, passing down needed attributes
+		let optimizedLeft = node.left;
+		let optimizedRight = node.right;
+
+		// If left side is also a join, pass needed attributes down
+		if (node.left.type === "Join") {
+			optimizedLeft = optimizeJoin(node.left as Join, new Set(leftAttrs));
+		} else {
+			optimizedLeft = optimize(node.left);
+		}
+
+		// If right side is also a join, pass needed attributes down
+		if (node.right.type === "Join") {
+			optimizedRight = optimizeJoin(node.right as Join, new Set(rightAttrs));
+		} else {
+			optimizedRight = optimize(node.right);
+		}
+
+		// Add projections if we have specific needed attributes and they would reduce columns
+		if (leftAttrs.length > 0 && leftAttrs.length < 100 && allNeededAttrs.size > 0) {
+			// Check if left side is not already a projection with these exact attributes
+			if (optimizedLeft.type !== "Projection") {
+				appliedRules.push(
+					`Push projection on left side of join: π[${leftAttrs.join(", ")}]`,
+				);
+				optimizedLeft = {
+					type: "Projection",
+					attributes: leftAttrs,
+					input: optimizedLeft,
+				};
+			}
+		}
+
+		if (rightAttrs.length > 0 && rightAttrs.length < 100 && allNeededAttrs.size > 0) {
+			// Check if right side is not already a projection with these exact attributes
+			if (optimizedRight.type !== "Projection") {
+				appliedRules.push(
+					`Push projection on right side of join: π[${rightAttrs.join(", ")}]`,
+				);
+				optimizedRight = {
+					type: "Projection",
+					attributes: rightAttrs,
+					input: optimizedRight,
+				};
+			}
+		}
 
 		return {
 			type: "Join",
