@@ -13,35 +13,25 @@ export interface PushDownProjectionsResult {
 
 /**
  * Extracts all attribute names from a list of qualified attributes
- * Example: ["TB1.name", "TB3.sal"] → ["TB1.name", "TB3.sal", "name", "sal"]
+ * Keeps only the qualified version (e.g., "TB1.name" not "name")
+ * Example: ["TB1.name", "TB3.sal"] → ["TB1.name", "TB3.sal"]
  */
 function extractAttributeNames(attributes: string[]): Set<string> {
-	const result = new Set<string>();
-	for (const attr of attributes) {
-		result.add(attr);
-		// Also add unqualified version (after the dot)
-		if (attr.includes(".")) {
-			const parts = attr.split(".");
-			result.add(parts[parts.length - 1]);
-		}
-	}
-	return result;
+	return new Set(attributes);
 }
 
 /**
  * Extracts attribute names from a join/selection condition
- * Example: "TB1.PK = TB2.FK" → ["TB1.PK", "TB2.FK", "PK", "FK"]
+ * Keeps only qualified versions when available
+ * Example: "TB1.PK = TB2.FK" → ["TB1.PK", "TB2.FK"]
  */
 function extractAttributesFromCondition(condition: string): Set<string> {
 	const result = new Set<string>();
-	// Match patterns like "table.column" or just "column"
+	// Match patterns like "table.column"
 	const matches = condition.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*\b/g);
 	if (matches) {
 		for (const match of matches) {
 			result.add(match);
-			// Also add unqualified version
-			const parts = match.split(".");
-			result.add(parts[parts.length - 1]);
 		}
 	}
 	return result;
