@@ -1,5 +1,7 @@
 import type { SelectStatement, Statement } from "./ast/types";
 import { SQLLexer } from "./lexer/SQLLexer";
+import { RelationalAlgebraOptimizer } from "./optimizer/RelationalAlgebraOptimizer";
+import type { OptimizationResult } from "./optimizer/types";
 import { createASTBuilder } from "./parser/ASTBuilder";
 import { SQLParser } from "./parser/SQLParser";
 import {
@@ -21,6 +23,8 @@ export {
 	SuggestionKind,
 } from "./autocomplete";
 export { SQLParseError } from "./errors";
+export { RelationalAlgebraOptimizer } from "./optimizer";
+export type * from "./optimizer/types";
 export {
 	ASTToAlgebraTranslator,
 	translationResultToString,
@@ -36,6 +40,8 @@ export interface ParseSuccess {
 	ast: Statement;
 	translation: TranslationResult;
 	translationString: string;
+	optimization?: OptimizationResult;
+	optimizationString?: string;
 }
 
 export interface ParseError {
@@ -75,9 +81,22 @@ export function parseSQL(input: string): ParseResult {
 
 	// Step 4: Translate to Relational Algebra (only for SELECT statements)
 	let translation: TranslationResult;
+	let optimization: OptimizationResult | undefined;
+	let optimizationString: string | undefined;
+
 	if (ast.type === "SelectStatement") {
 		const translator = new ASTToAlgebraTranslator();
 		translation = translator.translate(ast as SelectStatement);
+
+		// Step 5: Optimize the relational algebra tree (if translation succeeded)
+		if (translation.success) {
+			const optimizer = new RelationalAlgebraOptimizer();
+			optimization = optimizer.optimize(translation.algebra);
+			optimizationString = translationResultToString({
+				success: true,
+				algebra: optimization.optimized,
+			});
+		}
 	} else {
 		translation = {
 			success: false,
@@ -95,6 +114,8 @@ export function parseSQL(input: string): ParseResult {
 		ast,
 		translation,
 		translationString,
+		optimization,
+		optimizationString,
 	};
 }
 

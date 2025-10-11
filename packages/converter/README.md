@@ -8,12 +8,13 @@ SQL parser and converter to Abstract Syntax Tree (AST) and Relational Algebra.
 - ✅ **Syntax Parsing**: Chevrotain-based parser generating Concrete Syntax Tree (CST)
 - ✅ **AST Generation**: Type-safe Abstract Syntax Tree conversion
 - ✅ **Relational Algebra Translation**: Convert SQL queries to Relational Algebra notation
-- ✅ **Visual Diagrams**: Generate Mermaid diagrams for Relational Algebra trees
+- ✅ **Query Optimization**: Advanced heuristic-based optimization with 4 optimization rules
+- ✅ **Visual Diagrams**: Generate Mermaid diagrams for Relational Algebra trees with execution order
 - ✅ **Autocomplete**: Context-aware SQL autocomplete suggestions
 - ✅ **Schema Validation**: Validate queries against database schema with type checking
 - ✅ **Error Handling**: Custom SQLParseError with detailed error messages
 - ✅ **Type Safety**: Full TypeScript support with exported types
-- ✅ **Well Tested**: 103 comprehensive tests covering all features
+- ✅ **Well Tested**: 195 comprehensive tests covering all features
 
 ## Supported SQL Features
 
@@ -262,6 +263,136 @@ The Mermaid translator generates flowchart diagrams (top-to-bottom) that visuali
 
 **Note:** Special characters in the Mermaid output are escaped for proper rendering (dots become `\.`, asterisks become `\*`).
 
+### Query Optimization
+
+The converter includes an advanced query optimizer that applies heuristic rules to improve query execution performance. The optimization is automatically applied when parsing SQL queries.
+
+```typescript
+import { parseSQL, RelationalAlgebraOptimizer } from '@query-processor/converter';
+
+const result = parseSQL('SELECT name, email FROM users WHERE age > 18');
+
+if (result.success && result.optimization) {
+  console.log('Original:', result.translationString);
+  console.log('Optimized:', result.optimizationString);
+  console.log('Applied Rules:', result.optimization.appliedRules);
+}
+```
+
+**Implemented Optimization Heuristics:**
+
+#### 1. **Push Down Selections** (σ)
+Move selection operations as close to the base relations as possible to reduce the number of tuples processed by subsequent operations.
+
+**Example transformation:**
+```
+Original:    σ[age > 18](π[name, email](users))
+Optimized:   π[name, email](σ[age > 18](users))
+```
+
+**Benefit:** Reduces the number of tuples that need to be processed by the projection, as the selection filters rows before projecting columns.
+
+#### 2. **Push Down Projections** (π)
+Move projection operations closer to base relations and combine consecutive projections to reduce the number of attributes processed.
+
+**Example transformation:**
+```
+Original:    π[name](π[name, email, age](users))
+Optimized:   π[name](users)
+```
+
+**Benefit:** Eliminates redundant projections and reduces the number of attributes carried through the query execution.
+
+#### 3. **Apply Most Restrictive First**
+Reorder selection operations to execute the most restrictive (selective) conditions first, minimizing intermediate result sizes.
+
+**Example transformation:**
+```
+Original:    σ[age > 18](σ[status = 'active'](users))
+Optimized:   σ[status = 'active'](σ[age > 18](users))
+```
+*(If status = 'active' is more selective than age > 18)*
+
+**Benefit:** Reduces data volume earlier in the execution pipeline. The optimizer estimates selectivity based on operators:
+- Equality conditions (`=`) are most restrictive
+- Range conditions (`<`, `>`, `<=`, `>=`) are moderately restrictive
+- `AND` increases restrictiveness, `OR` decreases it
+
+#### 4. **Avoid Cartesian Product** (×)
+Convert Cartesian products to joins when there are applicable selection conditions, dramatically reducing intermediate result sizes.
+
+**Example transformation:**
+```
+Original:    σ[users.id = orders.user_id](users × orders)
+Optimized:   users ⨝[users.id = orders.user_id] orders
+```
+
+**Benefit:** Critical optimization! Cartesian products create |R| × |S| tuples. For example:
+- Users (1,000 rows) × Orders (1,000 rows) = 1,000,000 intermediate tuples!
+- Join with condition: Only matching rows (much smaller result set)
+- Enables efficient join algorithms (hash join, merge join)
+
+**Manual optimization:**
+
+You can also use the optimizer directly and choose which heuristics to apply:
+
+```typescript
+import { RelationalAlgebraOptimizer, OptimizationHeuristic } from '@query-processor/converter';
+
+const optimizer = new RelationalAlgebraOptimizer();
+
+// Apply all available heuristics (default - recommended)
+const result1 = optimizer.optimize(algebraTree);
+
+// Apply only specific heuristics
+const result2 = optimizer.optimize(algebraTree, [
+  OptimizationHeuristic.PUSH_DOWN_SELECTIONS,
+  OptimizationHeuristic.PUSH_DOWN_PROJECTIONS,
+  OptimizationHeuristic.APPLY_MOST_RESTRICTIVE_FIRST,
+  OptimizationHeuristic.AVOID_CARTESIAN_PRODUCT
+]);
+
+// Skip all optimizations (empty array)
+const result3 = optimizer.optimize(algebraTree, []);
+
+console.log('Optimized tree:', result1.optimized);
+console.log('Rules applied:', result1.appliedRules);
+```
+
+**Available Heuristics:**
+- `OptimizationHeuristic.PUSH_DOWN_SELECTIONS` - Move selections closer to base relations
+- `OptimizationHeuristic.PUSH_DOWN_PROJECTIONS` - Move projections down and combine consecutive ones
+- `OptimizationHeuristic.APPLY_MOST_RESTRICTIVE_FIRST` - Reorder selections by restrictiveness
+- `OptimizationHeuristic.AVOID_CARTESIAN_PRODUCT` - Convert cross products to joins
+
+**Combined Impact Example:**
+
+```sql
+SELECT u.name, o.total
+FROM users u, orders o
+WHERE u.id = o.user_id AND u.age > 18 AND u.status = 'active'
+```
+
+**Without optimization:**
+```
+π[name, total](σ[u.id = o.user_id AND u.age > 18 AND u.status = 'active'](users × orders))
+```
+- Cartesian product creates millions of tuples
+- All conditions applied at once on huge dataset
+
+**With all 4 optimizations:**
+```
+π[name, total](
+  users ⨝[u.id = o.user_id] orders  ← Cartesian product converted to join
+  with σ[u.status = 'active']        ← Most restrictive condition first
+  and σ[u.age > 18]                  ← Applied in order of restrictiveness
+)
+```
+- Join replaces Cartesian product (huge reduction)
+- Selections applied in optimal order
+- Projections simplified
+- **Result: Dramatically faster execution!** 🚀
+
 ### Autocomplete Suggestions
 
 Get context-aware SQL autocomplete suggestions for Monaco Editor or other editors:
@@ -459,7 +590,8 @@ The converter follows a multi-stage pipeline:
 4. **Translators**: Transform AST into different representations
    - **ASTToAlgebraTranslator**: Converts AST to Relational Algebra notation
    - **AlgebraToMermaidTranslator**: Converts Relational Algebra to Mermaid diagrams
-5. **Autocomplete**: Provides context-aware SQL suggestions from AST
+5. **Optimizer** (`RelationalAlgebraOptimizer`): Applies heuristic-based optimizations
+6. **Autocomplete**: Provides context-aware SQL suggestions from AST
 
 ```
 SQL Input → Lexer → Tokens → Parser → CST → AST Builder → AST
@@ -468,8 +600,12 @@ SQL Input → Lexer → Tokens → Parser → CST → AST Builder → AST
                                               ↓                           ↓
                                     Relational Algebra       Context-Aware Autocomplete
                                               ↓
-                                      Mermaid Diagram
-                                    (Visual Representation)
+                                    ┌─────────┴─────────┐
+                                    ↓                   ↓
+                            Optimizer          Mermaid Diagram
+                      (4 Heuristics)        (Visual Representation)
+                            ↓
+                   Optimized Algebra
 ```
 
 ### Operator Precedence
@@ -526,47 +662,65 @@ npm run test:watch
 ```
 src/
 ├── algebra/
-│   └── types.ts                     # Relational Algebra type definitions
+│   └── types.ts                            # Relational Algebra type definitions
 ├── ast/
-│   └── types.ts                     # AST type definitions
+│   └── types.ts                            # AST type definitions
 ├── autocomplete/
-│   ├── index.ts                     # Autocomplete logic
-│   └── types.ts                     # Autocomplete type definitions
+│   ├── index.ts                            # Autocomplete logic
+│   └── types.ts                            # Autocomplete type definitions
 ├── errors/
-│   ├── SQLParseError.ts             # Custom error class
+│   ├── SQLParseError.ts                    # Custom error class
 │   ├── lexerErrorHandler.ts
 │   └── parserErrorHandler.ts
 ├── lexer/
-│   ├── SQLLexer.ts                  # Tokenizer
-│   └── tokens/                      # Token definitions
+│   ├── SQLLexer.ts                         # Tokenizer
+│   └── tokens/                             # Token definitions
+├── optimizer/
+│   ├── RelationalAlgebraOptimizer.ts       # Optimizer orchestrator
+│   ├── optimizations/
+│   │   ├── pushDownSelections.ts           # Heuristic 1: Push selections down
+│   │   ├── pushDownProjections.ts          # Heuristic 2: Push projections down
+│   │   ├── applyMostRestrictiveFirst.ts    # Heuristic 3: Apply most restrictive first
+│   │   └── avoidCartesianProduct.ts        # Heuristic 4: Avoid Cartesian product
+│   └── types.ts                            # Optimizer type definitions
 ├── parser/
-│   ├── SQLParser.ts                 # Parser (CST generation)
-│   ├── ASTBuilder.ts                # CST to AST converter
-│   └── types.ts                     # Parser type definitions
+│   ├── SQLParser.ts                        # Parser (CST generation)
+│   ├── ASTBuilder.ts                       # CST to AST converter
+│   └── types.ts                            # Parser type definitions
 ├── translator/
-│   ├── ASTToAlgebraTranslator.ts    # AST to Relational Algebra
-│   ├── AlgebraToMermaidTranslator.ts # Relational Algebra to Mermaid
-│   ├── types.ts                     # Translator type definitions
-│   └── index.ts                     # Translator exports
+│   ├── ASTToAlgebraTranslator.ts           # AST to Relational Algebra
+│   ├── AlgebraToMermaidTranslator.ts       # Relational Algebra to Mermaid
+│   ├── types.ts                            # Translator type definitions
+│   └── index.ts                            # Translator exports
 ├── validator/
-│   ├── SchemaValidator.ts           # Schema validation logic
-│   ├── SchemaValidationError.ts     # Validation error class
-│   └── types.ts                     # Schema type definitions
-└── index.ts                         # Public API
+│   ├── SchemaValidator.ts                  # Schema validation logic
+│   ├── SchemaValidationError.ts            # Validation error class
+│   └── types.ts                            # Schema type definitions
+└── index.ts                                # Public API
+
+tests/
+└── e2e/
+    ├── algebra-to-mermaid.e2e.test.ts      # E2E tests for Mermaid generation
+    └── optimizer.e2e.test.ts               # E2E tests for optimizer
 ```
 
 ## Testing
 
-The package includes comprehensive tests:
+The package includes comprehensive tests (195 total):
 
 - **Lexer Tests**: Token recognition and error handling
 - **Parser Tests**: CST generation for various SQL structures
 - **AST Builder Tests**: AST conversion accuracy
 - **Relational Algebra Tests**: AST to Relational Algebra translation accuracy
+- **Optimizer Tests**: All 4 optimization heuristics with unit and integration tests
+  - Push Down Selections (6 tests)
+  - Push Down Projections (8 tests)
+  - Apply Most Restrictive First (9 tests)
+  - Avoid Cartesian Product (10 tests)
 - **Mermaid Translator Tests**: Relational Algebra to Mermaid diagram generation
 - **Autocomplete Tests**: Context-aware suggestions for different SQL contexts
 - **Schema Validation Tests**: Table, column, and type validation
-- **Integration Tests**: End-to-end parsing and translation
+- **E2E Tests**: End-to-end parsing, optimization, and diagram generation (23 tests)
 - **Error Handling Tests**: Lexer and parser error scenarios
 
 ## Tech Stack

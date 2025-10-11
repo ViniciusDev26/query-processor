@@ -26,7 +26,7 @@ describe("AlgebraToMermaidTranslator E2E", () => {
 
 		// Verify Mermaid output
 		expect(mermaidMarkdown).toContain("```mermaid");
-		expect(mermaidMarkdown).toContain("graph BT");
+		expect(mermaidMarkdown).toContain("graph TD");
 		expect(mermaidMarkdown).toContain("```");
 
 		// Note: Current algebra representation uses cross product notation
