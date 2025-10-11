@@ -1,4 +1,0 @@
-- Data que comecamos a salvar o parcelamento 
-- Resolver problema de conexão com o MySQL
-- Priorizar questão de segunda via nas comunicaćões
-- Verificar o total a ser cobrado da juntos que está sempre com o dado "parado" no mesmo valor

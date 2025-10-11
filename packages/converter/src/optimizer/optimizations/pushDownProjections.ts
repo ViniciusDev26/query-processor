@@ -263,23 +263,18 @@ export function pushDownProjections(
 		let optimizedRight = node.right;
 
 		// If left side is also a join, pass needed attributes down
+		// Don't add extra projections - the nested join will handle it
 		if (node.left.type === "Join") {
 			optimizedLeft = optimizeJoin(node.left as Join, new Set(leftAttrs));
 		} else {
 			optimizedLeft = optimize(node.left);
-		}
 
-		// If right side is also a join, pass needed attributes down
-		if (node.right.type === "Join") {
-			optimizedRight = optimizeJoin(node.right as Join, new Set(rightAttrs));
-		} else {
-			optimizedRight = optimize(node.right);
-		}
-
-		// Add projections if we have specific needed attributes and they would reduce columns
-		if (leftAttrs.length > 0 && leftAttrs.length < 100 && allNeededAttrs.size > 0) {
-			// Check if left side is not already a projection with these exact attributes
-			if (optimizedLeft.type !== "Projection") {
+			// Only add projection if it's not a join (to avoid redundant projections)
+			if (
+				leftAttrs.length > 0 &&
+				allNeededAttrs.size > 0 &&
+				optimizedLeft.type !== "Projection"
+			) {
 				appliedRules.push(
 					`Push projection on left side of join: π[${leftAttrs.join(", ")}]`,
 				);
@@ -291,9 +286,19 @@ export function pushDownProjections(
 			}
 		}
 
-		if (rightAttrs.length > 0 && rightAttrs.length < 100 && allNeededAttrs.size > 0) {
-			// Check if right side is not already a projection with these exact attributes
-			if (optimizedRight.type !== "Projection") {
+		// If right side is also a join, pass needed attributes down
+		// Don't add extra projections - the nested join will handle it
+		if (node.right.type === "Join") {
+			optimizedRight = optimizeJoin(node.right as Join, new Set(rightAttrs));
+		} else {
+			optimizedRight = optimize(node.right);
+
+			// Only add projection if it's not a join (to avoid redundant projections)
+			if (
+				rightAttrs.length > 0 &&
+				allNeededAttrs.size > 0 &&
+				optimizedRight.type !== "Projection"
+			) {
 				appliedRules.push(
 					`Push projection on right side of join: π[${rightAttrs.join(", ")}]`,
 				);
