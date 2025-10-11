@@ -7,6 +7,9 @@ SQL parser and converter to Abstract Syntax Tree (AST) and Relational Algebra.
 - ✅ **Lexical Analysis**: Tokenization with support for SQL keywords, operators, and literals
 - ✅ **Syntax Parsing**: Chevrotain-based parser generating Concrete Syntax Tree (CST)
 - ✅ **AST Generation**: Type-safe Abstract Syntax Tree conversion
+- ✅ **Relational Algebra Translation**: Convert SQL queries to Relational Algebra notation
+- ✅ **Visual Diagrams**: Generate Mermaid diagrams for Relational Algebra trees
+- ✅ **Autocomplete**: Context-aware SQL autocomplete suggestions
 - ✅ **Schema Validation**: Validate queries against database schema with type checking
 - ✅ **Error Handling**: Custom SQLParseError with detailed error messages
 - ✅ **Type Safety**: Full TypeScript support with exported types
@@ -34,7 +37,24 @@ SELECT * FROM users WHERE age < 18 OR age > 65
 -- Parenthesized expressions
 SELECT * FROM users WHERE (age > 18 AND status = 'active') OR role = 'admin'
 SELECT * FROM users WHERE ((age > 18 AND age < 65) OR role = 'admin') AND status = 'active'
+
+-- JOIN operations
+SELECT u.name, o.total FROM users u JOIN orders o ON u.id = o.user_id
+SELECT * FROM users JOIN orders ON users.id = orders.user_id WHERE users.age > 18
+
+-- Subqueries in FROM clause
+SELECT * FROM (SELECT * FROM users WHERE age > 18) AS adults
 ```
+
+### JOIN Operations
+- `INNER JOIN` with `ON` condition
+- Support for table aliases
+- Support for qualified column names (e.g., `users.id`, `u.name`)
+- Multiple JOINs in a single query
+
+### Subqueries
+- Subqueries in `FROM` clause
+- Subquery aliases with `AS`
 
 ### Supported Operators
 - Comparison: `=`, `!=`, `<>`, `<`, `>`, `<=`, `>=`
@@ -59,8 +79,13 @@ npm install @query-processor/converter
 ```typescript
 import { parseSQL } from '@query-processor/converter';
 
-const ast = parseSQL('SELECT * FROM users WHERE age > 18');
-console.log(ast);
+const result = parseSQL('SELECT * FROM users WHERE age > 18');
+
+if (result.success) {
+  console.log('AST:', result.ast);
+  console.log('Relational Algebra:', result.translationString);
+  // Output: π [*](σ [age > 18](users))
+}
 ```
 
 ### Schema Validation
@@ -141,50 +166,139 @@ console.log('Columns:', ast.columns); // Array of column identifiers
 console.log('Table:', ast.from); // 'users'
 ```
 
-### AST to Mermaid Visualization
+### Relational Algebra Translation
 
-Convert AST to Mermaid diagram syntax for visual representation:
+Convert SQL queries to Relational Algebra notation:
 
 ```typescript
-import { parseSQL, astToMermaidMarkdown } from '@query-processor/converter';
+import { parseSQL, ASTToAlgebraTranslator } from '@query-processor/converter';
+
+const result = parseSQL('SELECT name, email FROM users WHERE age > 18');
+
+if (result.success) {
+  // Access the translation result
+  console.log(result.translationString);
+  // Output: π [name, email](σ [age > 18](users))
+
+  // Or use the translator directly
+  const translator = new ASTToAlgebraTranslator();
+  const algebra = translator.translate(result.ast);
+
+  if (algebra.success) {
+    console.log(translator.algebraToString(algebra.algebra));
+  }
+}
+```
+
+**Supported operations:**
+- **Projection (π)**: Column selection
+- **Selection (σ)**: WHERE clause conditions
+- **Join (⨝)**: JOIN operations with conditions
+- **Cross Product (×)**: Cartesian product
+- **Relation**: Base tables
+
+**Example translations:**
+
+```sql
+SELECT * FROM users WHERE age > 18
+```
+→ `π [*](σ [age > 18](users))`
+
+```sql
+SELECT u.name, o.total
+FROM users u
+JOIN orders o ON u.id = o.user_id
+WHERE u.age > 18
+```
+→ `π [u.name, o.total](σ [u.age > 18](⨝ [u.id = o.user_id](users, orders)))`
+
+### Relational Algebra to Mermaid Visualization
+
+Convert Relational Algebra to Mermaid diagrams for visual representation:
+
+```typescript
+import { parseSQL, algebraToMermaidMarkdown } from '@query-processor/converter';
 
 const result = parseSQL('SELECT * FROM users WHERE age > 18');
 
-if (result.success) {
-  const mermaidDiagram = astToMermaidMarkdown(result.ast);
+if (result.success && result.translation.success) {
+  const mermaidDiagram = algebraToMermaidMarkdown(result.translation);
   console.log(mermaidDiagram);
   // Outputs markdown with mermaid code block:
   // ```mermaid
-  // graph TD
-  //   node0(["SELECT"])
-  //   node1(("*"))
-  //   ...
+  // graph BT
+  //   node0{{"π [*]"}}
+  //   node1{{"σ [age > 18]"}}
+  //   node2("users")
+  //   node0 --> node1
+  //   node1 --> node2
   // ```
 }
 ```
 
-The Mermaid translator generates flowchart diagrams that visualize the AST structure, showing:
-- Statement nodes (SELECT, FROM, WHERE, JOIN)
-- Column references and literals
-- Expression trees with operators
-- Parent-child relationships between nodes
+The Mermaid translator generates flowchart diagrams (bottom-to-top) that visualize the Relational Algebra tree structure, showing:
+- **Projection (π)** operations in hexagon shapes
+- **Selection (σ)** operations in hexagon shapes
+- **Join (⨝)** operations with left and right branches
+- **Relation** (table) nodes in rounded shapes
+- Parent-child relationships between operations
+
+### Autocomplete Suggestions
+
+Get context-aware SQL autocomplete suggestions for Monaco Editor or other editors:
+
+```typescript
+import { getAutocompleteSuggestions, SuggestionKind } from '@query-processor/converter';
+
+// Example: Getting suggestions at cursor position
+const sql = 'SELECT name FROM users WHERE ';
+const cursorPosition = sql.length;
+
+const suggestions = getAutocompleteSuggestions(sql, cursorPosition);
+
+console.log(suggestions);
+// Returns suggestions like:
+// [
+//   { label: 'age', kind: SuggestionKind.Field, ... },
+//   { label: 'email', kind: SuggestionKind.Field, ... },
+//   ...
+// ]
+```
+
+**Features:**
+- Context-aware suggestions based on cursor position
+- Column name suggestions from SELECT and WHERE clauses
+- SQL keyword suggestions (SELECT, FROM, WHERE, JOIN, etc.)
+- Comparison operators (=, !=, <, >, <=, >=)
+- Compatible with Monaco Editor's completion API
 
 ## API Reference
 
 ### Functions
 
-#### `parseSQL(input: string): Statement`
+#### `parseSQL(input: string): ParseResult`
 
-Parses a SQL query string and returns an AST.
+Parses a SQL query string and returns a result with AST and Relational Algebra translation.
 
 **Parameters:**
 - `input`: SQL query string to parse
 
 **Returns:**
-- `Statement`: Abstract Syntax Tree representation
-
-**Throws:**
-- `SQLParseError`: If the input contains lexical or syntax errors
+- `ParseResult`: Object with the following structure:
+  ```typescript
+  {
+    success: true;
+    ast: Statement;                  // Abstract Syntax Tree
+    translation: TranslationResult;  // Relational Algebra translation
+    translationString: string;       // Relational Algebra as string (e.g., "π [*](users)")
+  }
+  // or on error:
+  {
+    success: false;
+    error: string;
+    details: string[];
+  }
+  ```
 
 #### `validateSQL(input: string, schema: DatabaseSchema): ValidationError[]`
 
@@ -200,15 +314,36 @@ Validates a SQL query against a database schema.
 **Throws:**
 - `SQLParseError`: If the input contains lexical or syntax errors
 
-#### `astToMermaidMarkdown(ast: Statement): string`
+#### `algebraToMermaidMarkdown(result: TranslationResult): string`
 
-Converts an AST to Mermaid diagram syntax wrapped in a markdown code block.
+Converts a Relational Algebra translation to Mermaid diagram syntax wrapped in a markdown code block.
 
 **Parameters:**
-- `ast`: Statement AST to visualize
+- `result`: TranslationResult containing the Relational Algebra tree
 
 **Returns:**
 - `string`: Mermaid diagram code wrapped in markdown code fence
+
+#### `translationResultToString(result: TranslationResult): string`
+
+Converts a TranslationResult to a readable string representation using standard Relational Algebra notation.
+
+**Parameters:**
+- `result`: TranslationResult to convert
+
+**Returns:**
+- `string`: Relational Algebra notation (e.g., `π [*](σ [age > 18](users))`)
+
+#### `getAutocompleteSuggestions(sql: string, position: number): CompletionItem[]`
+
+Get context-aware autocomplete suggestions based on the SQL query and cursor position.
+
+**Parameters:**
+- `sql`: SQL query string
+- `position`: Cursor position in the query
+
+**Returns:**
+- `CompletionItem[]`: Array of completion suggestions compatible with Monaco Editor
 
 ### Types
 
@@ -236,6 +371,27 @@ class SQLParseError extends Error {
   details: string;
   constructor(message: string, details: string);
 }
+```
+
+#### `TranslationResult`
+Result of translating AST to Relational Algebra.
+
+```typescript
+type TranslationResult =
+  | { success: true; algebra: RelationalAlgebraNode }
+  | { success: false; error: string; details: string[] };
+```
+
+#### `RelationalAlgebraNode`
+Union type representing Relational Algebra operations.
+
+```typescript
+type RelationalAlgebraNode =
+  | Projection    // π - Column selection
+  | Selection     // σ - WHERE conditions
+  | Relation      // Base table
+  | Join          // ⨝ - JOIN operations
+  | CrossProduct; // × - Cartesian product
 ```
 
 #### `SchemaValidationError`
@@ -283,14 +439,18 @@ The converter follows a multi-stage pipeline:
 3. **AST Builder** (`ASTBuilder`): Converts CST to type-safe AST
 4. **Translators**: Transform AST into different representations
    - **ASTToAlgebraTranslator**: Converts AST to Relational Algebra notation
-   - **ASTToMermaidTranslator**: Converts AST to Mermaid diagram syntax
+   - **AlgebraToMermaidTranslator**: Converts Relational Algebra to Mermaid diagrams
+5. **Autocomplete**: Provides context-aware SQL suggestions from AST
 
 ```
 SQL Input → Lexer → Tokens → Parser → CST → AST Builder → AST
                                                             ↓
                                               ┌─────────────┴─────────────┐
                                               ↓                           ↓
-                                    Relational Algebra          Mermaid Diagram
+                                    Relational Algebra       Context-Aware Autocomplete
+                                              ↓
+                                      Mermaid Diagram
+                                    (Visual Representation)
 ```
 
 ### Operator Precedence
@@ -346,29 +506,34 @@ npm run test:watch
 
 ```
 src/
+├── algebra/
+│   └── types.ts                     # Relational Algebra type definitions
 ├── ast/
-│   └── types.ts           # AST type definitions
+│   └── types.ts                     # AST type definitions
+├── autocomplete/
+│   ├── index.ts                     # Autocomplete logic
+│   └── types.ts                     # Autocomplete type definitions
 ├── errors/
-│   ├── SQLParseError.ts   # Custom error class
+│   ├── SQLParseError.ts             # Custom error class
 │   ├── lexerErrorHandler.ts
 │   └── parserErrorHandler.ts
 ├── lexer/
-│   ├── SQLLexer.ts        # Tokenizer
-│   └── tokens/            # Token definitions
+│   ├── SQLLexer.ts                  # Tokenizer
+│   └── tokens/                      # Token definitions
 ├── parser/
-│   ├── SQLParser.ts       # Parser (CST generation)
-│   ├── ASTBuilder.ts      # CST to AST converter
-│   └── types.ts           # Parser type definitions
+│   ├── SQLParser.ts                 # Parser (CST generation)
+│   ├── ASTBuilder.ts                # CST to AST converter
+│   └── types.ts                     # Parser type definitions
 ├── translator/
-│   ├── ASTToAlgebraTranslator.ts  # AST to Relational Algebra
-│   ├── ASTToMermaidTranslator.ts  # AST to Mermaid diagram
-│   ├── types.ts           # Translator type definitions
-│   └── index.ts           # Translator exports
+│   ├── ASTToAlgebraTranslator.ts    # AST to Relational Algebra
+│   ├── AlgebraToMermaidTranslator.ts # Relational Algebra to Mermaid
+│   ├── types.ts                     # Translator type definitions
+│   └── index.ts                     # Translator exports
 ├── validator/
-│   ├── SchemaValidator.ts # Schema validation logic
-│   ├── SchemaValidationError.ts # Validation error class
-│   └── types.ts           # Schema type definitions
-└── index.ts               # Public API
+│   ├── SchemaValidator.ts           # Schema validation logic
+│   ├── SchemaValidationError.ts     # Validation error class
+│   └── types.ts                     # Schema type definitions
+└── index.ts                         # Public API
 ```
 
 ## Testing
@@ -378,8 +543,11 @@ The package includes comprehensive tests:
 - **Lexer Tests**: Token recognition and error handling
 - **Parser Tests**: CST generation for various SQL structures
 - **AST Builder Tests**: AST conversion accuracy
+- **Relational Algebra Tests**: AST to Relational Algebra translation accuracy
+- **Mermaid Translator Tests**: Relational Algebra to Mermaid diagram generation
+- **Autocomplete Tests**: Context-aware suggestions for different SQL contexts
 - **Schema Validation Tests**: Table, column, and type validation
-- **Integration Tests**: End-to-end parsing
+- **Integration Tests**: End-to-end parsing and translation
 - **Error Handling Tests**: Lexer and parser error scenarios
 
 ## Tech Stack
