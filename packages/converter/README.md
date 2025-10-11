@@ -226,22 +226,41 @@ if (result.success && result.translation.success) {
   console.log(mermaidDiagram);
   // Outputs markdown with mermaid code block:
   // ```mermaid
-  // graph BT
-  //   node0{{"π [*]"}}
-  //   node1{{"σ [age > 18]"}}
-  //   node2("users")
-  //   node0 --> node1
+  // graph TD
+  //   node2("1\. users")
+  //   node1{{"2\. σ [age > 18]"}}
   //   node1 --> node2
+  //   node0{{"3\. π [\*]"}}
+  //   node0 --> node1
   // ```
 }
 ```
 
-The Mermaid translator generates flowchart diagrams (bottom-to-top) that visualize the Relational Algebra tree structure, showing:
+The Mermaid translator generates flowchart diagrams (top-to-bottom) that visualize the Relational Algebra tree structure, showing:
 - **Projection (π)** operations in hexagon shapes
 - **Selection (σ)** operations in hexagon shapes
 - **Join (⨝)** operations with left and right branches
 - **Relation** (table) nodes in rounded shapes
 - Parent-child relationships between operations
+- **Execution order**: Each node is prefixed with a number indicating the order of execution (1, 2, 3...), following the bottom-up execution model where leaf nodes (Relations) are executed first, followed by Joins, Selections, and finally Projections
+
+**Example execution order for**: `SELECT * FROM users WHERE age > 18`
+```
+1\. users        (Relation - load table)
+2\. σ [age > 18] (Selection - filter rows)
+3\. π [*]        (Projection - select columns)
+```
+
+**Complex example with JOINs**: `SELECT u.name, o.total FROM users u JOIN orders o ON u.id = o.user_id WHERE u.age > 18`
+```
+1\. users                     (Relation - load first table)
+2\. orders                    (Relation - load second table)
+3\. ⨝ [u\.id = o\.user_id]    (Join - combine tables)
+4\. σ [u\.age > 18]           (Selection - filter rows)
+5\. π [u\.name, o\.total]     (Projection - select columns)
+```
+
+**Note:** Special characters in the Mermaid output are escaped for proper rendering (dots become `\.`, asterisks become `\*`).
 
 ### Autocomplete Suggestions
 

@@ -24,6 +24,8 @@ export { SQLParseError } from "./errors";
 export {
 	ASTToAlgebraTranslator,
 	translationResultToString,
+	AlgebraToMermaidTranslator,
+	algebraToMermaidMarkdown,
 } from "./translator";
 export type * from "./translator/types";
 export { SchemaValidationError } from "./validator/SchemaValidationError";

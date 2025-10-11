@@ -13,6 +13,7 @@ import type { TranslationResult } from "./types";
  */
 export class AlgebraToMermaidTranslator {
 	private nodeCounter = 0;
+	private executionOrder = 0;
 	private lines: string[] = [];
 
 	/**
@@ -23,10 +24,11 @@ export class AlgebraToMermaidTranslator {
 	 */
 	translate(result: TranslationResult): string {
 		this.nodeCounter = 0;
+		this.executionOrder = 0;
 		this.lines = [];
 
-		// Start Mermaid flowchart (bottom to top for better algebra tree visualization)
-		this.lines.push("graph BT");
+		// Start Mermaid flowchart (top to bottom for execution order visualization)
+		this.lines.push("graph TD");
 
 		if (!result.success) {
 			// Show error in diagram
@@ -45,18 +47,24 @@ export class AlgebraToMermaidTranslator {
 		return `node${this.nodeCounter++}`;
 	}
 
+	private getExecutionOrder(): number {
+		return ++this.executionOrder;
+	}
+
 	private escapeLabel(label: string): string {
 		// Escape special characters within labels
 		return label
 			.replace(/\\/g, "\\\\") // Escape backslashes first
 			.replace(/"/g, '\\"') // Escape quotes
-			.replace(/\*/g, "\\*"); // Escape asterisks (markdown list)
+			.replace(/\*/g, "\\*") // Escape asterisks (markdown list)
+			.replace(/\./g, "\\."); // Escape dots
 	}
 
 	private addNode(
 		id: string,
 		label: string,
 		shape: "rect" | "round" | "hexagon" = "rect",
+		executionOrder?: number,
 	): void {
 		const shapeMap = {
 			rect: ['["', '"]'],
@@ -65,7 +73,11 @@ export class AlgebraToMermaidTranslator {
 		};
 		const [open, close] = shapeMap[shape];
 		const escapedLabel = this.escapeLabel(label);
-		this.lines.push(`    ${id}${open}${escapedLabel}${close}`);
+		const labelWithOrder =
+			executionOrder !== undefined
+				? `${executionOrder}. ${escapedLabel}`
+				: escapedLabel;
+		this.lines.push(`    ${id}${open}${labelWithOrder}${close}`);
 	}
 
 	private addEdge(from: string, to: string, label?: string): void {
@@ -94,16 +106,20 @@ export class AlgebraToMermaidTranslator {
 	private translateProjection(node: Projection): string {
 		const projId = this.getNodeId();
 
+		// Translate input first (bottom-up execution)
+		const inputId = this.translateAlgebraNode(node.input);
+
 		// Format attributes
 		const attrs =
 			node.attributes.length === 0 || node.attributes.includes("*")
 				? "\\*"
 				: node.attributes.join(", ");
 
-		this.addNode(projId, `π [${attrs}]`, "hexagon");
+		// Add projection node with execution order
+		const order = this.getExecutionOrder();
+		this.addNode(projId, `π [${attrs}]`, "hexagon", order);
 
-		// Translate input and connect
-		const inputId = this.translateAlgebraNode(node.input);
+		// Connect to input
 		this.addEdge(projId, inputId);
 
 		return projId;
@@ -112,13 +128,17 @@ export class AlgebraToMermaidTranslator {
 	private translateSelection(node: Selection): string {
 		const selId = this.getNodeId();
 
+		// Translate input first (bottom-up execution)
+		const inputId = this.translateAlgebraNode(node.input);
+
 		// Format condition
 		const condition = node.condition;
 
-		this.addNode(selId, `σ [${condition}]`, "hexagon");
+		// Add selection node with execution order
+		const order = this.getExecutionOrder();
+		this.addNode(selId, `σ [${condition}]`, "hexagon", order);
 
-		// Translate input and connect
-		const inputId = this.translateAlgebraNode(node.input);
+		// Connect to input
 		this.addEdge(selId, inputId);
 
 		return selId;
@@ -126,19 +146,23 @@ export class AlgebraToMermaidTranslator {
 
 	private translateRelation(node: Relation): string {
 		const relId = this.getNodeId();
-		this.addNode(relId, node.name, "round");
+		// Relations are executed first (they are leaf nodes)
+		const order = this.getExecutionOrder();
+		this.addNode(relId, node.name, "round", order);
 		return relId;
 	}
 
 	private translateJoin(node: Join): string {
 		const joinId = this.getNodeId();
 
-		// Format: ⨝ [condition]
-		this.addNode(joinId, `⨝ [${node.condition}]`, "hexagon");
-
-		// Translate left and right inputs
+		// Translate left and right inputs first (bottom-up execution)
 		const leftId = this.translateAlgebraNode(node.left);
 		const rightId = this.translateAlgebraNode(node.right);
+
+		// Format: ⨝ [condition]
+		// Join is executed after both inputs are ready
+		const order = this.getExecutionOrder();
+		this.addNode(joinId, `⨝ [${node.condition}]`, "hexagon", order);
 
 		// Connect both inputs to the join
 		this.addEdge(joinId, leftId, "left");
@@ -150,12 +174,14 @@ export class AlgebraToMermaidTranslator {
 	private translateCrossProduct(node: CrossProduct): string {
 		const crossId = this.getNodeId();
 
-		// Format: ×
-		this.addNode(crossId, "×", "hexagon");
-
-		// Translate left and right inputs
+		// Translate left and right inputs first (bottom-up execution)
 		const leftId = this.translateAlgebraNode(node.left);
 		const rightId = this.translateAlgebraNode(node.right);
+
+		// Format: ×
+		// Cross product is executed after both inputs are ready
+		const order = this.getExecutionOrder();
+		this.addNode(crossId, "×", "hexagon", order);
 
 		// Connect both inputs to the cross product
 		this.addEdge(crossId, leftId, "left");
