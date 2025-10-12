@@ -38,6 +38,10 @@ export class ASTToAlgebraTranslator {
 	 */
 	translate(ast: SelectStatement): TranslationResult {
 		try {
+			// Build the query tree in a deliberately non-optimized way to demonstrate optimizations
+			// This builds: Projection -> Selection -> Joins -> Relations
+			// The optimizer will then push selections down and reorder operations
+
 			// 1. Start with base relation(s) from FROM clause
 			let algebra: RelationalAlgebraNode = this.translateFromClause(ast.from);
 
@@ -46,7 +50,8 @@ export class ASTToAlgebraTranslator {
 				algebra = this.applyJoins(algebra, ast.joins);
 			}
 
-			// 3. Apply WHERE clause as Selection operation
+			// 3. Apply WHERE clause as Selection operation on top of everything
+			// This is intentionally non-optimized: selection at the top means we filter AFTER joining
 			if (ast.where) {
 				const condition = this.buildConditionString(ast.where.condition);
 				algebra = {
@@ -56,7 +61,8 @@ export class ASTToAlgebraTranslator {
 				};
 			}
 
-			// 4. Apply SELECT columns as Projection operation
+			// 4. Apply SELECT columns as Projection operation at the very top
+			// This is also non-optimized: projecting AFTER selection means we carry unnecessary columns
 			const columnNames = this.extractColumnNames(ast.columns);
 			algebra = {
 				type: "Projection",

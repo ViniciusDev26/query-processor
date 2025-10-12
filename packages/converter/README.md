@@ -261,7 +261,7 @@ The Mermaid translator generates flowchart diagrams (top-to-bottom) that visuali
 5\. π [u\.name, o\.total]     (Projection - select columns)
 ```
 
-**Note:** Special characters in the Mermaid output are escaped for proper rendering (dots become `\.`, asterisks become `\*`).
+**Note:** Special characters in the Mermaid output are escaped for proper rendering (asterisks become `\*`).
 
 ### Query Optimization
 
@@ -392,6 +392,421 @@ WHERE u.id = o.user_id AND u.age > 18 AND u.status = 'active'
 - Selections applied in optimal order
 - Projections simplified
 - **Result: Dramatically faster execution!** 🚀
+
+### Optimization Workflow Details
+
+Each heuristic follows a specific workflow to transform the query plan. Here's a detailed breakdown of how each optimization works internally:
+
+#### 1. Push Down Selections (σ) - Workflow
+
+**Goal:** Move selection (filter) operations as close as possible to base relations (tables) to reduce the number of tuples processed by subsequent operations.
+
+**Why it matters:** Filtering data early means less data to process in joins, projections, and other expensive operations.
+
+**Workflow:**
+1. **Start at root**, traverse tree recursively (post-order: process children first, then parent)
+2. **When encountering a Selection node** `σ[condition](child)`:
+
+   **Case A: Child is a Projection (π)**
+   - Selection can safely pass through projection
+   - **Transform**: `σ[condition](π[attrs](input))` → `π[attrs](σ[condition](input))`
+   - **Reason**: Filtering before projecting is more efficient
+
+   **Case B: Child is a Join (⨝) or Cross Product (×)**
+   - **Decompose** compound conditions:
+     - Split `AND` conditions into individual predicates
+     - Example: `(a > 5 AND b < 10)` → `["a > 5", "b < 10"]`
+   - **Analyze** each predicate to determine which relations it references:
+     - Extract qualified column names (e.g., `users.id`, `orders.total`)
+     - Get relation names from left and right subtrees
+   - **Classify** predicates into three categories:
+     - **Left-only**: References only left-side relations → push to left child
+     - **Right-only**: References only right-side relations → push to right child
+     - **Both sides**: References both relations → keep above join (can't push down)
+   - **Push** predicates to appropriate sides by wrapping children with selections
+   - **Recurse** on nested joins to push selections all the way down to base relations
+
+   **Case C: Child is a Relation (base table)**
+   - Already at the bottom, cannot push further
+   - Keep selection as-is
+
+3. **Repeat** until all selections are as close to base relations as possible
+
+**Detailed Example:**
+```
+Query: SELECT * FROM TB1 JOIN TB2 JOIN TB3 WHERE TB1.id > 300 AND TB3.sal != 0
+
+Initial tree:  σ[(TB1.id > 300 AND TB3.sal != 0)](TB1 ⨝ TB2 ⨝ TB3)
+
+Step 1: Decompose compound condition
+        Input:  "TB1.id > 300 AND TB3.sal != 0"
+        Output: ["TB1.id > 300", "TB3.sal != 0"]
+
+Step 2: Analyze top-level join (TB1 ⨝ TB2) ⨝ TB3
+        Left subtree relations:  [TB1, TB2]
+        Right subtree relations: [TB3]
+
+        Classify predicates:
+        - "TB1.id > 300"  → references TB1 → left-only
+        - "TB3.sal != 0"  → references TB3 → right-only
+
+Step 3: Push predicates to respective sides
+        Result: σ[TB1.id > 300](TB1 ⨝ TB2) ⨝ σ[TB3.sal != 0](TB3)
+
+Step 4: Recurse on left subtree (TB1 ⨝ TB2)
+        Only one predicate: "TB1.id > 300"
+        Left subtree:  TB1
+        Right subtree: TB2
+
+        Classify: "TB1.id > 300" references only TB1 → left-only
+
+Step 5: Push to TB1
+        Result: σ[TB1.id > 300](TB1) ⨝ TB2
+
+Final optimized tree:
+        (σ[TB1.id > 300](TB1) ⨝ TB2) ⨝ σ[TB3.sal != 0](TB3)
+```
+
+**Performance impact:**
+- Without: Filter 1M rows after joining 3 tables
+- With: Filter each table first, then join (e.g., 1K + 500K + 200K = 701K rows filtered)
+
+---
+
+#### 2. Push Down Projections (π) - Workflow
+
+**Goal:** Move projection (column selection) operations closer to base relations and eliminate redundant projections to reduce the number of attributes carried through query execution.
+
+**Why it matters:** Fewer columns = less memory, less I/O, faster processing. Critical for queries with wide tables.
+
+**Workflow:**
+1. **Start at root**, traverse tree recursively
+2. **When encountering a Projection node** `π[attributes](child)`:
+
+   **Case A: Child is another Projection**
+   - **Combine** projections: Only the outer attributes matter
+   - **Transform**: `π[outer_attrs](π[inner_attrs](input))` → `π[outer_attrs](input)`
+   - **Reason**: Inner projection is redundant; final output only needs outer attributes
+
+   **Case B: Child is a Join (⨝)**
+   - **Extract required attributes**:
+     - Attributes from outer projection list (what user wants)
+     - Attributes from join condition (needed to perform join)
+   - **Combine** into single set of needed attributes
+   - **Get relation information**:
+     - Traverse left and right subtrees to collect all relation names
+   - **Classify attributes** by which relation they belong to:
+     - Parse qualified names (e.g., `TB1.name` → belongs to TB1)
+   - **For each child subtree**:
+     - If child is a **base relation or selection**: Insert projection with needed attributes for that side
+     - If child is a **join**: Recursively push down with needed attributes (don't add extra projection yet)
+   - **Result**: Each base relation projects only the columns it needs for joins and final output
+
+   **Case C: Child is a Selection (σ)**
+   - Projection can pass through selection
+   - **Recurse** with projection attributes to child of selection
+
+   **Case D: Child is a Relation (base table)**
+   - Already at bottom, projection stays here
+
+3. **Repeat** until projections are as close to base relations as possible
+
+**Detailed Example:**
+```
+Query: SELECT TB1.name, TB3.salary
+       FROM TB1 JOIN TB2 ON TB1.id = TB2.fk1
+       JOIN TB3 ON TB2.id = TB3.fk2
+
+Initial tree:  π[TB1.name, TB3.salary](
+                 TB1 ⨝[TB1.id = TB2.fk1] TB2 ⨝[TB2.id = TB3.fk2] TB3
+               )
+
+Step 1: Encounter outer projection
+        Projection attrs: [TB1.name, TB3.salary]
+        Child: Join node → ⨝[TB2.id = TB3.fk2]
+
+Step 2: Extract join condition attributes
+        Condition: "TB2.id = TB3.fk2"
+        Attributes needed for join: [TB2.id, TB3.fk2]
+
+Step 3: Combine needed attributes
+        Total needed: [TB1.name, TB3.salary, TB2.id, TB3.fk2]
+
+Step 4: Classify by side (left vs right)
+        Left subtree (TB1 ⨝ TB2): [TB1.name, TB2.id, TB3.fk2]
+                                   But TB3.fk2 doesn't belong here!
+                                   Actually: [TB1.name, TB2.id]
+                                   (TB2.id comes from left side of this join)
+        Right subtree (TB3):      [TB3.salary, TB3.fk2]
+
+Step 5: Recurse on left join (TB1 ⨝[TB1.id = TB2.fk1] TB2)
+        Needed from above: [TB1.name, TB2.id]
+        Join condition: [TB1.id, TB2.fk1]
+        Total needed: [TB1.name, TB2.id, TB1.id, TB2.fk1]
+
+        Classify by side:
+        Left (TB1):  [TB1.name, TB1.id]
+        Right (TB2): [TB2.id, TB2.fk1]
+
+Step 6: Insert projections at base relations
+        Left: π[TB1.name, TB1.id](TB1)
+        Right: π[TB2.id, TB2.fk1](TB2)
+
+Step 7: Process right side of original join (TB3)
+        Needed: [TB3.salary, TB3.fk2]
+        Insert: π[TB3.salary, TB3.fk2](TB3)
+
+Final optimized tree:
+        π[TB1.name, TB3.salary](
+          ⨝[TB2.id = TB3.fk2](
+            ⨝[TB1.id = TB2.fk1](
+              π[TB1.name, TB1.id](TB1),
+              π[TB2.id, TB2.fk1](TB2)
+            ),
+            π[TB3.salary, TB3.fk2](TB3)
+          )
+        )
+```
+
+**Performance impact:**
+- Without: If TB1 has 50 columns, all 50 flow through entire query
+- With: Only 2 columns from TB1 (name, id) flow through query
+- Example: 1M rows × 50 cols vs 1M rows × 2 cols = 25x less data!
+
+---
+
+#### 3. Apply Most Restrictive First - Workflow
+
+**Goal:** Reorder consecutive selection operations so the most selective (restrictive) conditions execute first, minimizing the size of intermediate results.
+
+**Why it matters:** If condition A filters 90% of rows and condition B filters 10%, applying A first processes 10x less data in B.
+
+**Workflow:**
+1. **Traverse tree** looking for consecutive selections
+2. **When encountering** `σ[condition1](σ[condition2](input))`:
+
+   **Estimate selectivity** of each condition:
+   - Start with base score = 1.0 (100% of rows pass)
+   - **Equality operators** (`=`): Most selective → multiply by 0.1
+   - **Range operators** (`<`, `>`, `<=`, `>=`, `!=`, `<>`): Moderately selective → multiply by 0.3
+   - **AND** operators: More ANDs = more restrictive → multiply by 0.5^(AND_count)
+   - **OR** operators: More ORs = less restrictive → multiply by 1.5^(OR_count)
+   - **Final score**: Lower = more restrictive = should execute first
+
+   **Compare selectivity scores**:
+   - If `score(outer) < score(inner)`: Outer is more restrictive
+   - Swap positions to put more restrictive condition first
+
+   **Example calculation**:
+   ```
+   Condition A: "age > 18"
+   - 1 range operator: 1.0 × 0.3 = 0.3
+
+   Condition B: "status = 'active' AND role = 'admin'"
+   - 2 equality operators: 1.0 × 0.1 × 0.1 = 0.01
+   - 1 AND: 0.01 × 0.5 = 0.005
+
+   0.005 < 0.3 → B is more restrictive, should execute first
+   ```
+
+3. **Recurse** on child nodes to optimize entire tree
+4. **Result**: Most selective filters execute first, reducing data volume early
+
+**Detailed Example:**
+```
+Query: SELECT * FROM users
+       WHERE age > 18 AND status = 'active'
+
+Initial tree (after selection push-down):
+        σ[age > 18](σ[status = 'active'](users))
+
+Step 1: Estimate selectivity of outer condition
+        Condition: "age > 18"
+        Analysis:
+        - Base score: 1.0
+        - Has 1 range operator (>): 1.0 × 0.3 = 0.3
+        - No AND/OR operators
+        Final score: 0.3
+
+Step 2: Estimate selectivity of inner condition
+        Condition: "status = 'active'"
+        Analysis:
+        - Base score: 1.0
+        - Has 1 equality operator (=): 1.0 × 0.1 = 0.1
+        - No AND/OR operators
+        Final score: 0.1
+
+Step 3: Compare scores
+        Outer: 0.3
+        Inner: 0.1
+        0.1 < 0.3 → Inner is MORE restrictive than outer
+        Keep current order (already optimal)
+
+Result: σ[age > 18](σ[status = 'active'](users))
+        (Equality condition executes first, as intended)
+
+---
+
+Counter-example (needs reordering):
+
+Initial tree:  σ[status = 'active'](σ[age > 18](users))
+
+Step 1: Score outer = 0.1 (equality)
+Step 2: Score inner = 0.3 (range)
+Step 3: 0.1 < 0.3 → Outer is MORE restrictive
+        SWAP positions!
+
+Result: σ[age > 18](σ[status = 'active'](users))
+```
+
+**Real-world example:**
+```
+Table: 1,000,000 users
+
+Condition A: age > 18          → filters to ~750,000 rows (25% reduction)
+Condition B: status = 'active' → filters to ~50,000 rows (95% reduction)
+
+Without optimization (A then B):
+  1,000,000 rows → A → 750,000 rows → B → 50,000 rows
+  Total rows processed: 1,000,000 + 750,000 = 1,750,000
+
+With optimization (B then A):
+  1,000,000 rows → B → 50,000 rows → A → ~37,500 rows
+  Total rows processed: 1,000,000 + 50,000 = 1,050,000
+
+Improvement: 40% less data processed!
+```
+
+---
+
+#### 4. Avoid Cartesian Product (×) - Workflow
+
+**Goal:** Convert Cartesian product followed by selection into a proper join operation, dramatically reducing intermediate result size.
+
+**Why it matters:** Cartesian products are EXTREMELY expensive! `R × S` creates `|R| × |S|` tuples. A join only creates matching tuples.
+
+**Workflow:**
+1. **Traverse tree** looking for the pattern: `σ[condition](R × S)`
+2. **When pattern found**:
+
+   **Extract relation information**:
+   - Get relation names from left subtree (e.g., "users", "TB1")
+   - Get relation names from right subtree (e.g., "orders", "TB2")
+
+   **Analyze selection condition**:
+   - Parse condition for equality comparisons
+   - Look for pattern: `relation1.column = relation2.column`
+   - Example: `users.id = orders.user_id`, `TB1.pk = TB2.fk`
+
+   **Check if condition is a valid join condition**:
+   - Verify condition references relations from BOTH sides
+   - Verify it's an equality comparison (=)
+   - If not a valid join condition, keep as Cartesian product
+
+   **If valid join condition found**:
+   - **Replace** CrossProduct (×) with Join (⨝)
+   - **Move** condition from Selection (σ) to Join
+   - **Remove** the Selection node entirely
+   - **Result**: `σ[R.a = S.b](R × S)` → `R ⨝[R.a = S.b] S`
+
+3. **Recurse** on child nodes to handle nested patterns
+4. **Result**: Efficient join instead of Cartesian product + filter
+
+**Detailed Example:**
+```
+Query: SELECT u.name, o.total
+       FROM users u, orders o
+       WHERE u.id = o.user_id
+
+Initial tree (without optimization):
+        π[u.name, o.total](
+          σ[u.id = o.user_id](
+            users × orders
+          )
+        )
+
+Step 1: Detect pattern
+        Node type: Selection
+        Child type: CrossProduct
+        Pattern match: ✓ σ[condition](R × S)
+
+Step 2: Extract relation names
+        CrossProduct.left:  users
+        CrossProduct.right: orders
+
+Step 3: Analyze condition
+        Condition: "u.id = o.user_id"
+
+        Parse for qualified column references:
+        - "u.id" → table "u" (alias for users), column "id"
+        - "o.user_id" → table "o" (alias for orders), column "user_id"
+
+        Check operator: "=" → equality ✓
+
+        Check if both sides referenced:
+        - Left side (users): "u.id" references users ✓
+        - Right side (orders): "o.user_id" references orders ✓
+
+        Valid join condition: ✓
+
+Step 4: Transform to join
+        Before: σ[u.id = o.user_id](users × orders)
+        After:  users ⨝[u.id = o.user_id] orders
+
+        Selection node is eliminated!
+
+Final optimized tree:
+        π[u.name, o.total](
+          users ⨝[u.id = o.user_id] orders
+        )
+```
+
+**Performance impact (MASSIVE!):**
+
+**Scenario**: 1,000 users, 10,000 orders
+
+**Without optimization (Cartesian product)**:
+```
+Step 1: users × orders
+        → 1,000 × 10,000 = 10,000,000 intermediate tuples
+        → Each tuple ~1KB = ~10GB of intermediate data!
+
+Step 2: σ[u.id = o.user_id](10,000,000 tuples)
+        → Filter down to ~10,000 matching tuples
+        → Process 10,000,000 tuples to get 10,000 results
+
+Total: 10,000,000 tuples created and processed
+```
+
+**With optimization (Join)**:
+```
+Step 1: users ⨝[u.id = o.user_id] orders
+        → Database uses hash join or merge join
+        → Only creates ~10,000 matching tuples directly
+        → ~10MB of data
+
+Total: 10,000 tuples created and processed
+```
+
+**Result**: ~1000x improvement! (10,000,000 vs 10,000 tuples)
+
+**Real-world example (extreme case)**:
+```
+Products: 100,000 rows
+Orders: 1,000,000 rows
+
+Without: 100,000 × 1,000,000 = 100,000,000,000 tuples (100 billion!)
+         At 1KB/tuple = 100TB of intermediate data
+         Would crash most systems or take hours/days
+
+With:    ~1,000,000 matching tuples (assuming each product has ~10 orders)
+         At 1KB/tuple = ~1GB of data
+         Completes in seconds
+
+Speedup: 100,000x faster!!! 🚀
+```
+
+**Note**: This is why SQL engines strongly prefer joins over Cartesian products, and why this optimization is absolutely critical for query performance.
 
 ### Autocomplete Suggestions
 

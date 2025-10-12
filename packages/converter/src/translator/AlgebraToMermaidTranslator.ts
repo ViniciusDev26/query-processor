@@ -56,8 +56,7 @@ export class AlgebraToMermaidTranslator {
 		return label
 			.replace(/\\/g, "\\\\") // Escape backslashes first
 			.replace(/"/g, '\\"') // Escape quotes
-			.replace(/\*/g, "\\*") // Escape asterisks (markdown list)
-			.replace(/\./g, "\\."); // Escape dots
+			.replace(/\*/g, "\\*"); // Escape asterisks (markdown list)
 	}
 
 	private addNode(

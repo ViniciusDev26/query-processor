@@ -175,12 +175,12 @@ describe("AlgebraToMermaidTranslator", () => {
 		// Verify structure
 		expect(mermaid).toContain("graph TD");
 		expect(mermaid).toContain("π");
-		expect(mermaid).toContain("u\\.name, o\\.total");
+		expect(mermaid).toContain("u.name, o.total");
 		expect(mermaid).toContain("σ");
-		expect(mermaid).toContain("u\\.age >= 18");
-		expect(mermaid).toContain("o\\.status = 'completed'");
-		expect(mermaid).toContain("p\\.price > 100");
-		expect(mermaid).toContain("o\\.product_id = p\\.id");
+		expect(mermaid).toContain("u.age >= 18");
+		expect(mermaid).toContain("o.status = 'completed'");
+		expect(mermaid).toContain("p.price > 100");
+		expect(mermaid).toContain("o.product_id = p.id");
 		expect(mermaid).toContain("users");
 		expect(mermaid).toContain("orders");
 		expect(mermaid).toContain("products");
@@ -232,8 +232,8 @@ describe("AlgebraToMermaidTranslator", () => {
 		expect(mermaid).toContain("π");
 		expect(mermaid).toContain("σ");
 		expect(mermaid).toContain("⨝"); // Join symbol
-		expect(mermaid).toContain("u\\.id = o\\.user_id");
-		expect(mermaid).toContain("o\\.product_id = p\\.id");
+		expect(mermaid).toContain("u.id = o.user_id");
+		expect(mermaid).toContain("o.product_id = p.id");
 		expect(mermaid).toContain("users");
 		expect(mermaid).toContain("orders");
 		expect(mermaid).toContain("products");
@@ -289,17 +289,17 @@ describe("AlgebraToMermaidTranslator", () => {
 
 		// Verify projection
 		expect(mermaid).toContain("π");
-		expect(mermaid).toContain("TB1\\.name, TB3\\.sal");
+		expect(mermaid).toContain("TB1.name, TB3.sal");
 
 		// Verify selection (WHERE clause)
 		expect(mermaid).toContain("σ");
-		expect(mermaid).toContain("TB1\\.id > 300");
-		expect(mermaid).toContain("TB3\\.sal <> 0");
+		expect(mermaid).toContain("TB1.id > 300");
+		expect(mermaid).toContain("TB3.sal <> 0");
 
 		// Verify joins
 		expect(mermaid).toContain("⨝");
-		expect(mermaid).toContain("TB1\\.PK = TB2\\.FK");
-		expect(mermaid).toContain("TB2\\.PK = TB3\\.FK");
+		expect(mermaid).toContain("TB1.PK = TB2.FK");
+		expect(mermaid).toContain("TB2.PK = TB3.FK");
 
 		// Verify relations (tables)
 		expect(mermaid).toContain("TB1");

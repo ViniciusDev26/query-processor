@@ -10,19 +10,12 @@ describe("AlgebraToMermaidTranslator E2E", () => {
 		// Parse SQL
 		const parseResult = parseSQL(sql);
 
-		console.log("\n=== E2E Test: Full SQL to Mermaid ===");
-		console.log("SQL:", sql);
-		console.log("\nParse result:", JSON.stringify(parseResult, null, 2));
-
 		expect(parseResult.success).toBe(true);
 
 		if (!parseResult.success) return;
 
 		// Generate Mermaid diagram
 		const mermaidMarkdown = algebraToMermaidMarkdown(parseResult.translation);
-
-		console.log("\n=== Generated Mermaid Diagram ===");
-		console.log(mermaidMarkdown);
 
 		// Verify Mermaid output
 		expect(mermaidMarkdown).toContain("```mermaid");
@@ -39,17 +32,11 @@ describe("AlgebraToMermaidTranslator E2E", () => {
 
 		const parseResult = parseSQL(sql);
 
-		console.log("\n=== E2E Test: Simple SELECT with WHERE ===");
-		console.log("SQL:", sql);
-
 		expect(parseResult.success).toBe(true);
 
 		if (!parseResult.success) return;
 
 		const mermaidMarkdown = algebraToMermaidMarkdown(parseResult.translation);
-
-		console.log("\n=== Generated Mermaid Diagram ===");
-		console.log(mermaidMarkdown);
 
 		expect(mermaidMarkdown).toContain("```mermaid");
 		expect(mermaidMarkdown).toContain("π");
@@ -68,17 +55,11 @@ describe("AlgebraToMermaidTranslator E2E", () => {
 
 		const parseResult = parseSQL(sql);
 
-		console.log("\n=== E2E Test: Complex Query ===");
-		console.log("SQL:", sql);
-
 		expect(parseResult.success).toBe(true);
 
 		if (!parseResult.success) return;
 
 		const mermaidMarkdown = algebraToMermaidMarkdown(parseResult.translation);
-
-		console.log("\n=== Generated Mermaid Diagram ===");
-		console.log(mermaidMarkdown);
 
 		expect(mermaidMarkdown).toContain("```mermaid");
 		expect(mermaidMarkdown).toContain("π");

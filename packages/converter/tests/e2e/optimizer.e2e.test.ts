@@ -369,9 +369,6 @@ describe("Optimizer E2E Tests", () => {
 			};
 			const optimizedMermaid = algebraToMermaidMarkdown(optimizedResult);
 
-			console.log("OPTIMIZED MERMAID:");
-			console.log(optimizedMermaid);
-
 			// Both diagrams should be valid Mermaid markdown
 			expect(originalMermaid).toContain("```mermaid");
 			expect(originalMermaid).toContain("graph TD");
@@ -389,22 +386,6 @@ describe("Optimizer E2E Tests", () => {
 			expect(optimizedMermaid).toContain("π"); // Projection
 			expect(optimizedMermaid).toContain("σ"); // Selection
 			expect(optimizedMermaid).toContain("⨝"); // Join
-
-			// Output for visual inspection (visible when running with --reporter=verbose)
-			console.log("\n=== ORIGINAL RELATIONAL ALGEBRA ===");
-			console.log(result.translationString);
-			console.log("\n=== ORIGINAL MERMAID DIAGRAM ===");
-			console.log(originalMermaid);
-
-			console.log("\n=== OPTIMIZED RELATIONAL ALGEBRA ===");
-			console.log(result.optimizationString);
-			console.log("\n=== OPTIMIZED MERMAID DIAGRAM ===");
-			console.log(optimizedMermaid);
-
-			console.log("\n=== APPLIED OPTIMIZATION RULES ===");
-			result.optimization.appliedRules.forEach((rule, index) => {
-				console.log(`${index + 1}. ${rule}`);
-			});
 
 			// Verify optimization was applied (or query was already optimal)
 			expect(result.optimization.appliedRules).toBeDefined();
