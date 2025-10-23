@@ -9,6 +9,8 @@ import {
 import type { TranslationResult } from "./translator/types";
 import { SchemaValidator } from "./validator/SchemaValidator";
 import type { DatabaseSchema, ValidationError } from "./validator/types";
+import { optimizeQuery, algebraToString, explainOptimization } from "./optimizer";
+import type { RelationalAlgebraNode } from "./algebra/types";
 
 // Re-export types
 export type * from "./ast/types";
@@ -28,12 +30,17 @@ export {
 export type * from "./translator/types";
 export { SchemaValidationError } from "./validator/SchemaValidationError";
 export type * from "./validator/types";
+export { optimizeQuery, algebraToString, explainOptimization } from "./optimizer";
+export type * from "./algebra/types";
 
 export interface ParseSuccess {
 	success: true;
 	ast: Statement;
 	translation: TranslationResult;
 	translationString: string;
+	optimizedAlgebra?: RelationalAlgebraNode;
+	optimizedAlgebraString?: string;
+	optimizationExplanation?: string;
 }
 
 export interface ParseError {
@@ -73,9 +80,23 @@ export function parseSQL(input: string): ParseResult {
 
 	// Step 4: Translate to Relational Algebra (only for SELECT statements)
 	let translation: TranslationResult;
+	let optimizedAlgebra: RelationalAlgebraNode | undefined;
+	let optimizedAlgebraString: string | undefined;
+	let optimizationExplanation: string | undefined;
+
 	if (ast.type === "SelectStatement") {
 		const translator = new ASTToAlgebraTranslator();
 		translation = translator.translate(ast as SelectStatement);
+
+		// Step 5: Optimize the relational algebra (if translation succeeded)
+		if (translation.success && translation.algebra) {
+			optimizedAlgebra = optimizeQuery(translation.algebra);
+			optimizedAlgebraString = algebraToString(optimizedAlgebra);
+			optimizationExplanation = explainOptimization(
+				translation.algebra,
+				optimizedAlgebra
+			);
+		}
 	} else {
 		translation = {
 			success: false,
@@ -93,6 +114,9 @@ export function parseSQL(input: string): ParseResult {
 		ast,
 		translation,
 		translationString,
+		optimizedAlgebra,
+		optimizedAlgebraString,
+		optimizationExplanation,
 	};
 }
 
