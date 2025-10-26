@@ -29,24 +29,21 @@ import type { OptimizationRuleMetadata } from '../types';
  * CURRENT STATUS: Passthrough - returns input unchanged
  */
 function applyRestrictiveOrdering(node: RelationalAlgebraNode): RelationalAlgebraNode {
-  // TODO: Remove this passthrough and implement the optimization
-  return node;
-
   // Estrutura para quando implementar:
-  // switch (node.type) {
-  //   case 'Relation':
-  //     return node;
-  //   case 'Selection':
-  //     return optimizeSelectionOrder(node);
-  //   case 'Projection':
-  //     return {
-  //       type: 'Projection',
-  //       attributes: node.attributes,
-  //       input: applyRestrictiveOrdering(node.input)
-  //     };
-  //   default:
-  //     return node;
-  // }
+  switch (node.type) {
+    case 'Relation':
+      return node;
+    case 'Selection':
+      return optimizeSelectionOrder(node);
+    case 'Projection':
+      return {
+        type: 'Projection',
+        attributes: node.attributes,
+        input: applyRestrictiveOrdering(node.input)
+      };
+    default:
+      return node;
+  }
 }
 
 /**
@@ -68,23 +65,27 @@ function optimizeSelectionOrder(selection: Selection): RelationalAlgebraNode {
     current = current.input;
   }
 
+  // Recursively optimize the input (the non-selection node at the bottom)
+  const optimizedBase = applyRestrictiveOrdering(current);
+
   // If we have multiple selections, reorder them
   if (selections.length > 1) {
-    // TODO: Sort selections by estimated selectivity
-    // const sortedSelections = sortBySelectivity(selections);
+    // Sort selections by estimated selectivity (most restrictive first)
+    const sortedSelections = sortBySelectivity(selections);
 
-    // For now, just keep the original order and recursively optimize
-    // TODO: Implement proper reordering logic
+    // Rebuild the selection chain from the bottom up, starting with the optimized base
+    return sortedSelections.reduceRight((acc, sel) => ({
+      type: 'Selection',
+      condition: sel.condition,
+      input: acc
+    }), optimizedBase);
   }
 
-  // Recursively optimize the input (the non-selection node)
-  const optimizedInput = applyRestrictiveOrdering(current);
-
-  // Rebuild the selection chain
+  // Only one selection, just return it on top of the optimized base
   return {
     type: 'Selection',
     condition: selection.condition,
-    input: optimizedInput
+    input: optimizedBase
   };
 }
 

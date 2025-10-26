@@ -169,6 +169,13 @@ describe("SQLLexer", () => {
 		expect(result.tokens[7].tokenType).toBe(NumberLiteral);
 	});
 
+	it("should ignore trailing semicolons", () => {
+		const result = SQLLexer.tokenize("SELECT name FROM users;");
+		expect(result.errors).toHaveLength(0);
+		expect(result.tokens).toHaveLength(4);
+		expect(result.tokens.map((token) => token.image)).not.toContain(";");
+	});
+
 	it("should tokenize complex WHERE with AND/OR", () => {
 		const result = SQLLexer.tokenize(
 			"SELECT * FROM users WHERE age >= 18 AND name = 'John' OR id < 100",
