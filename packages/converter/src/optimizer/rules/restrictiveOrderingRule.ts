@@ -139,10 +139,16 @@ function estimateSelectivity(condition: string): number {
 
   // 3. Check for LIKE operators
   if (condition.toLowerCase().includes(' like ')) {
-    if (condition.includes('%')) {
-      return 0.8; // Not very selective with wildcards
+    // Check for leading wildcard (more expensive, less selective)
+    // Pattern: LIKE '%...' or LIKE "%..."
+    if (condition.match(/like\s+['"]%/i)) {
+      return 0.8; // Not very selective with leading wildcard
     }
-    return 0.3; // More selective without leading wildcard
+    // Has wildcard but not leading (more selective - can use index prefix scan)
+    if (condition.includes('%')) {
+      return 0.3; // More selective without leading wildcard
+    }
+    return 0.3; // No wildcard at all, most selective LIKE
   }
 
   // 4. Check for BETWEEN
