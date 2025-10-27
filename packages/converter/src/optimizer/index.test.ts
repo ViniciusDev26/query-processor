@@ -30,9 +30,11 @@ describe("Optimizer", () => {
 			expect(result).toEqual(query);
 		});
 
-		it("should keep selection compatible with projection pushdown", () => {
-			// Original: σ[age > 18](π[name, age](users))
-			// Selection pushdown + projection pushdown keeps selection on top but ensures required attributes
+		it("should move projection above selection for efficient execution", () => {
+			// Original (inefficient): σ[age > 18](π[name, age](users))
+			// This processes all columns through selection, then projects
+			// Optimized (efficient): π[name, age](σ[age > 18](users))
+			// This filters rows first, then projects only needed columns
 			const query: Selection = {
 				type: "Selection",
 				condition: "age > 18",
@@ -48,12 +50,14 @@ describe("Optimizer", () => {
 
 			const result = optimizeQuery(query);
 
-			expect(result.type).toBe("Selection");
-			if (result.type === "Selection") {
-				expect(result.condition).toBe("age > 18");
-				expect(result.input.type).toBe("Projection");
-				if (result.input.type === "Projection") {
-					expect(result.input.attributes).toEqual(["name", "age"]);
+			// Selection pushdown moves selection closer to relation
+			// Result should be: Projection -> Selection -> Relation
+			expect(result.type).toBe("Projection");
+			if (result.type === "Projection") {
+				expect(result.attributes).toEqual(["name", "age"]);
+				expect(result.input.type).toBe("Selection");
+				if (result.input.type === "Selection") {
+					expect(result.input.condition).toBe("age > 18");
 					expect(result.input.input).toEqual({
 						type: "Relation",
 						name: "users"
@@ -125,9 +129,9 @@ describe("Optimizer", () => {
 			}
 		});
 
-		it("should reflect projection pushdown in algebra string", () => {
+		it("should reflect selection pushdown in algebra string", () => {
 			// Original: σ[age > 18](π[name, age](users))
-			// Optimized after projection pushdown: σ[age > 18](π[name, age](users))
+			// Optimized after selection pushdown: π[name, age](σ[age > 18](users))
 			const query: RelationalAlgebraNode = {
 				type: "Selection",
 				condition: "age > 18",
@@ -144,8 +148,8 @@ describe("Optimizer", () => {
 			const optimized = optimizeQuery(query);
 			const optimizedStr = algebraToString(optimized);
 
-			// Projection pushdown keeps selection on top in current pipeline
-			expect(optimizedStr).toBe("σ[age > 18](π[name, age](users))");
+			// Selection pushdown moves selection closer to relation
+			expect(optimizedStr).toBe("π[name, age](σ[age > 18](users))");
 		});
 
 		it("should handle projection without selections", () => {

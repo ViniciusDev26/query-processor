@@ -71,23 +71,9 @@ function optimizeProjection(projection: Projection): RelationalAlgebraNode {
     }
   }
 
-  // Push projection below selection if the selection only uses projected attributes
-  if (optimizedInput.type === 'Selection') {
-    const selection = optimizedInput;
-    if (canPushProjectionThroughSelection(normalizedAttributes, selection.condition)) {
-      const pushedProjection: Projection = {
-        type: 'Projection',
-        attributes: normalizedAttributes,
-        input: selection.input,
-      };
-
-      return {
-        type: 'Selection',
-        condition: selection.condition,
-        input: applyProjectionPushdown(pushedProjection),
-      };
-    }
-  }
+  // Do NOT push final projection below selection - that would be anti-optimization!
+  // Projection should stay above selection to project AFTER filtering.
+  // Only push down if we're adding an intermediate projection to reduce I/O.
 
   return {
     type: 'Projection',

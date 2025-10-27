@@ -101,7 +101,7 @@ describe("projectionPushdownRule", () => {
 		expect(result).toEqual(relation);
 	});
 
-	it("should push projection below selection when safe", () => {
+	it("should keep projection above selection (projection after filtering is more efficient)", () => {
 		const relation: Relation = {
 			type: "Relation",
 			name: "users",
@@ -117,16 +117,18 @@ describe("projectionPushdownRule", () => {
 			},
 		};
 
-		const result = projectionPushdownRule.apply(input) as Selection;
+		const result = projectionPushdownRule.apply(input);
 
-		expect(result.type).toBe("Selection");
-		if (result.type === "Selection") {
-			expect(result.condition).toBe("age > 18");
-			expect(result.input).toEqual({
-				type: "Projection",
-				attributes: ["name", "age"],
-				input: relation,
-			});
+		// Projection should stay above selection - filter first, then project
+		// This is more efficient: σ reduces rows, then π reduces columns
+		expect(result.type).toBe("Projection");
+		if (result.type === "Projection") {
+			expect(result.attributes).toEqual(["name", "age"]);
+			expect(result.input.type).toBe("Selection");
+			if (result.input.type === "Selection") {
+				expect(result.input.condition).toBe("age > 18");
+				expect(result.input.input).toEqual(relation);
+			}
 		}
 	});
 
@@ -363,7 +365,7 @@ describe("projectionPushdownRule", () => {
 		}
 	});
 
-	it("should preserve projection with wildcard when safe to push through selection", () => {
+	it("should eliminate wildcard projection above selection", () => {
 		const relation: Relation = {
 			type: "Relation",
 			name: "users",
@@ -381,7 +383,7 @@ describe("projectionPushdownRule", () => {
 
 		const result = projectionPushdownRule.apply(input);
 
-		// Wildcard projection should be eliminated entirely
+		// Wildcard projection (π[*]) is redundant and should be eliminated
 		expect(result.type).toBe("Selection");
 		if (result.type === "Selection") {
 			expect(result.condition).toBe("age > 18");

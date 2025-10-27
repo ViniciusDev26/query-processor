@@ -57,6 +57,12 @@ export function algebraToString(node: RelationalAlgebraNode): string {
       return `π[${attrs}](${algebraToString(node.input)})`;
     }
 
+    case 'Join':
+      return `(${algebraToString(node.left)} ⨝[${node.condition}] ${algebraToString(node.right)})`;
+
+    case 'CrossProduct':
+      return `(${algebraToString(node.left)} × ${algebraToString(node.right)})`;
+
     default:
       return 'Unknown';
   }

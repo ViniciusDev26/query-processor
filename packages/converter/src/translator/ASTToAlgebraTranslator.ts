@@ -120,16 +120,21 @@ export class ASTToAlgebraTranslator {
 			// Build the condition string for the JOIN
 			const condition = this.buildConditionString(join.on);
 
-			// Apply cross product (represented as a nested relation in the selection)
-			// In real algebra, this would be: σ[condition](base × joinRelation)
-			// We'll represent it as a Selection with a special cross-product input
+			// Create a proper CrossProduct structure
+			const crossProduct: RelationalAlgebraNode = {
+				type: "CrossProduct",
+				left: result,
+				right: {
+					type: "Relation",
+					name: join.table,
+				},
+			};
+
+			// Wrap in Selection with the JOIN condition
 			result = {
 				type: "Selection",
 				condition,
-				input: {
-					type: "Relation",
-					name: `(${this.nodeToString(result)} × ${join.table})`,
-				},
+				input: crossProduct,
 			};
 		}
 
