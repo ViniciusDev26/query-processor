@@ -5,6 +5,7 @@ import { SQLParser } from "./parser/SQLParser";
 import {
 	ASTToAlgebraTranslator,
 	translationResultToString,
+	AlgebraToMermaidTranslator,
 } from "./translator";
 import type { TranslationResult } from "./translator/types";
 import { SchemaValidator } from "./validator/SchemaValidator";
@@ -26,6 +27,8 @@ export { SQLParseError } from "./errors";
 export {
 	ASTToAlgebraTranslator,
 	translationResultToString,
+	AlgebraToMermaidTranslator,
+	algebraToMermaidMarkdown,
 } from "./translator";
 export type * from "./translator/types";
 export { SchemaValidationError } from "./validator/SchemaValidationError";
@@ -41,6 +44,8 @@ export interface ParseSuccess {
 	optimizedAlgebra?: RelationalAlgebraNode;
 	optimizedAlgebraString?: string;
 	optimizationExplanation?: string;
+	mermaidOriginal?: string;
+	mermaidOptimized?: string;
 }
 
 export interface ParseError {
@@ -83,19 +88,31 @@ export function parseSQL(input: string): ParseResult {
 	let optimizedAlgebra: RelationalAlgebraNode | undefined;
 	let optimizedAlgebraString: string | undefined;
 	let optimizationExplanation: string | undefined;
+	let mermaidOriginal: string | undefined;
+	let mermaidOptimized: string | undefined;
 
 	if (ast.type === "SelectStatement") {
 		const translator = new ASTToAlgebraTranslator();
 		translation = translator.translate(ast as SelectStatement);
 
-		// Step 5: Optimize the relational algebra (if translation succeeded)
+		// Step 5: Generate Mermaid diagram for original algebra
 		if (translation.success && translation.algebra) {
+			const mermaidTranslator = new AlgebraToMermaidTranslator();
+			mermaidOriginal = mermaidTranslator.translate(translation);
+
+			// Step 6: Optimize the relational algebra
 			optimizedAlgebra = optimizeQuery(translation.algebra);
 			optimizedAlgebraString = algebraToString(optimizedAlgebra);
 			optimizationExplanation = explainOptimization(
 				translation.algebra,
 				optimizedAlgebra
 			);
+
+			// Step 7: Generate Mermaid diagram for optimized algebra
+			mermaidOptimized = mermaidTranslator.translate({
+				success: true,
+				algebra: optimizedAlgebra,
+			});
 		}
 	} else {
 		translation = {
@@ -117,6 +134,8 @@ export function parseSQL(input: string): ParseResult {
 		optimizedAlgebra,
 		optimizedAlgebraString,
 		optimizationExplanation,
+		mermaidOriginal,
+		mermaidOptimized,
 	};
 }
 

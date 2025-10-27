@@ -8,20 +8,20 @@ import { CodeViewer } from "./components/CodeViewer";
 import { SqlEditor } from "./components/SqlEditor";
 import { ValidationErrors } from "./components/ValidationErrors";
 import { databaseSchema } from "./schema";
-import { buildOperatorGraph } from 'operator-graph';
-import { OperatorGraphView } from './components/OperatorGraph';
-import type { OperatorGraph } from 'operator-graph'; 
+import { MermaidGraphView } from './components/MermaidGraphView'; 
 function App() {
     const [sqlQuery, setSqlQuery] = useState("");
     const [validationErrors, setValidationErrors] = useState<ValidationError[]>(
         [],
     );
-    const [operatorGraph, setOperatorGraph] = useState<OperatorGraph | null>(null);
+    const [mermaidOriginal, setMermaidOriginal] = useState<string | null>(null);
+    const [mermaidOptimized, setMermaidOptimized] = useState<string | null>(null);
 
     function handleSqlSubmit() {
-        // Clear previous errors
+        // Clear previous errors and graphs
         setValidationErrors([]);
-        setOperatorGraph(null); // Limpa o grafo anterior
+        setMermaidOriginal(null);
+        setMermaidOptimized(null);
 
         console.log("SQL Query submitted:", sqlQuery);
 
@@ -51,18 +51,18 @@ function App() {
         console.log("Generated AST:", result.ast);
         console.log("Relational Algebra:", result.translation);
         console.log("Relational Algebra String:", result.translationString);
+        console.log("Optimized Algebra:", result.optimizedAlgebra);
+        console.log("Optimized Algebra String:", result.optimizedAlgebraString);
+        console.log("Mermaid Original:", result.mermaidOriginal);
+        console.log("Mermaid Optimized:", result.mermaidOptimized);
 
-        // Gera o grafo de operadores a partir do plano algébrico
-        if (
-            result.translation &&
-            typeof result.translation === "object" &&
-            "algebra" in result.translation
-        ) {
-            // Now TypeScript knows algebra exists
-            console.log("Plano algébrico para o grafo:", result.translation.algebra);
-            const graph = buildOperatorGraph((result.translation as any).algebra);
-            console.log("Grafo gerado:", graph);
-            setOperatorGraph(graph);
+        // Set Mermaid diagrams for visualization
+        if (result.mermaidOriginal) {
+            setMermaidOriginal(result.mermaidOriginal);
+        }
+
+        if (result.mermaidOptimized) {
+            setMermaidOptimized(result.mermaidOptimized);
         }
     }
 
@@ -80,9 +80,12 @@ function App() {
                     code={JSON.stringify(databaseSchema, null, 2)}
                 />
                 <ValidationErrors errors={validationErrors} />
-                {operatorGraph && (
+                {mermaidOriginal && (
                     <div className="mt-6">
-                        <OperatorGraphView graph={operatorGraph} />
+                        <MermaidGraphView
+                            mermaidOriginal={mermaidOriginal}
+                            mermaidOptimized={mermaidOptimized}
+                        />
                     </div>
                 )}
             </section>
