@@ -15,6 +15,7 @@ import {
 	LParen,
 	NotEquals,
 	RParen,
+	Semicolon,
 	Star,
 } from "./operators";
 import { And, As, From, Inner, Join, On, Or, Select, Where } from "./keywords";
@@ -23,6 +24,7 @@ import { And, As, From, Inner, Join, On, Or, Select, Where } from "./keywords";
 // Comparison operators with multiple characters must come before single characters
 export const allTokens = [
 	WhiteSpace,
+	Semicolon,
 	// Keywords (must be before Identifier)
 	Select,
 	From,

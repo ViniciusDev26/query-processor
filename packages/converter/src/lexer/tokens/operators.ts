@@ -1,4 +1,4 @@
-import { createToken } from "chevrotain";
+import { createToken, Lexer } from "chevrotain";
 
 // Comparison Operators
 export const Equals = createToken({ name: "Equals", pattern: /=/ });
@@ -20,3 +20,8 @@ export const Comma = createToken({ name: "Comma", pattern: /,/ });
 export const LParen = createToken({ name: "LParen", pattern: /\(/ });
 export const RParen = createToken({ name: "RParen", pattern: /\)/ });
 export const Dot = createToken({ name: "Dot", pattern: /\./ });
+export const Semicolon = createToken({
+	name: "Semicolon",
+	pattern: /;/,
+	group: Lexer.SKIPPED,
+});

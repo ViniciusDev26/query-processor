@@ -30,9 +30,9 @@ describe("Optimizer", () => {
 			expect(result).toEqual(query);
 		});
 
-		it("should push selection below projection", () => {
+		it("should keep selection compatible with projection pushdown", () => {
 			// Original: σ[age > 18](π[name, age](users))
-			// Optimized: π[name, age](σ[age > 18](users))
+			// Selection pushdown + projection pushdown keeps selection on top but ensures required attributes
 			const query: Selection = {
 				type: "Selection",
 				condition: "age > 18",
@@ -48,12 +48,12 @@ describe("Optimizer", () => {
 
 			const result = optimizeQuery(query);
 
-			expect(result.type).toBe("Projection");
-			if (result.type === "Projection") {
-				expect(result.attributes).toEqual(["name", "age"]);
-				expect(result.input.type).toBe("Selection");
-				if (result.input.type === "Selection") {
-					expect(result.input.condition).toBe("age > 18");
+			expect(result.type).toBe("Selection");
+			if (result.type === "Selection") {
+				expect(result.condition).toBe("age > 18");
+				expect(result.input.type).toBe("Projection");
+				if (result.input.type === "Projection") {
+					expect(result.input.attributes).toEqual(["name", "age"]);
 					expect(result.input.input).toEqual({
 						type: "Relation",
 						name: "users"
@@ -62,7 +62,7 @@ describe("Optimizer", () => {
 			}
 		});
 
-		it("should keep consecutive selections together", () => {
+		it("should reorder consecutive selections by selectivity", () => {
 			// σ[age > 18](σ[name = 'John'](users))
 			// Should remain the same (both selections pushed down to relation)
 			const query: Selection = {
@@ -82,10 +82,10 @@ describe("Optimizer", () => {
 
 			expect(result.type).toBe("Selection");
 			if (result.type === "Selection") {
-				expect(result.condition).toBe("age > 18");
+				expect(result.condition).toBe("name = 'John'");
 				expect(result.input.type).toBe("Selection");
 				if (result.input.type === "Selection") {
-					expect(result.input.condition).toBe("name = 'John'");
+					expect(result.input.condition).toBe("age > 18");
 					expect(result.input.input).toEqual({
 						type: "Relation",
 						name: "users"
@@ -94,9 +94,40 @@ describe("Optimizer", () => {
 			}
 		});
 
-		it("should push selection through projection to relation", () => {
+		it("should reorder selections by estimated selectivity", () => {
+			// σ[age > 18](σ[id = 123](users)) → σ[id = 123](σ[age > 18](users))
+			const query: Selection = {
+				type: "Selection",
+				condition: "age > 18",
+				input: {
+					type: "Selection",
+					condition: "id = 123",
+					input: {
+						type: "Relation",
+						name: "users"
+					}
+				}
+			};
+
+			const result = optimizeQuery(query);
+
+			expect(result.type).toBe("Selection");
+			if (result.type === "Selection") {
+				expect(result.condition).toBe("id = 123");
+				expect(result.input.type).toBe("Selection");
+				if (result.input.type === "Selection") {
+					expect(result.input.condition).toBe("age > 18");
+					expect(result.input.input).toEqual({
+						type: "Relation",
+						name: "users"
+					});
+				}
+			}
+		});
+
+		it("should reflect projection pushdown in algebra string", () => {
 			// Original: σ[age > 18](π[name, age](users))
-			// Optimized: π[name, age](σ[age > 18](users))
+			// Optimized after projection pushdown: σ[age > 18](π[name, age](users))
 			const query: RelationalAlgebraNode = {
 				type: "Selection",
 				condition: "age > 18",
@@ -113,8 +144,8 @@ describe("Optimizer", () => {
 			const optimized = optimizeQuery(query);
 			const optimizedStr = algebraToString(optimized);
 
-			// The selection should now be between projection and relation
-			expect(optimizedStr).toBe("π[name, age](σ[age > 18](users))");
+			// Projection pushdown keeps selection on top in current pipeline
+			expect(optimizedStr).toBe("σ[age > 18](π[name, age](users))");
 		});
 
 		it("should handle projection without selections", () => {
@@ -217,10 +248,10 @@ describe("Optimizer", () => {
 			expect(explanation).toContain("No optimization needed");
 		});
 
-		it("should explain selection pushdown optimization", () => {
-			const original: Selection = {
-				type: "Selection",
-				condition: "age > 18",
+		it("should explain projection pushdown optimization", () => {
+			const original: Projection = {
+				type: "Projection",
+				attributes: ["name"],
 				input: {
 					type: "Projection",
 					attributes: ["name", "age"],
@@ -236,10 +267,9 @@ describe("Optimizer", () => {
 
 			expect(explanation).toContain("Original:");
 			expect(explanation).toContain("Optimized:");
-			expect(explanation).toContain("Optimizations available:");
-			expect(explanation).toContain("selection-pushdown");
-			expect(explanation).toContain("σ[age > 18](π[name, age](users))");
-			expect(explanation).toContain("π[name, age](σ[age > 18](users))");
+			expect(explanation).toContain("projection-pushdown");
+			expect(explanation).toContain("π[name](π[name, age](users))");
+			expect(explanation).toContain("π[name](users)");
 		});
 	});
 });
