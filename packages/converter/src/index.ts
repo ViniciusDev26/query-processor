@@ -5,7 +5,7 @@ import { SQLParser } from "./parser/SQLParser";
 import {
 	ASTToAlgebraTranslator,
 	translationResultToString,
-	AlgebraToMermaidTranslator,
+	algebraToMermaid,
 } from "./translator";
 import type { TranslationResult } from "./translator/types";
 import { SchemaValidator } from "./validator/SchemaValidator";
@@ -27,7 +27,7 @@ export { SQLParseError } from "./errors";
 export {
 	ASTToAlgebraTranslator,
 	translationResultToString,
-	AlgebraToMermaidTranslator,
+	algebraToMermaid,
 	algebraToMermaidMarkdown,
 } from "./translator";
 export type * from "./translator/types";
@@ -97,8 +97,7 @@ export function parseSQL(input: string): ParseResult {
 
 		// Step 5: Generate Mermaid diagram for original algebra
 		if (translation.success && translation.algebra) {
-			const mermaidTranslator = new AlgebraToMermaidTranslator();
-			mermaidOriginal = mermaidTranslator.translate(translation);
+			mermaidOriginal = algebraToMermaid(translation);
 
 			// Step 6: Optimize the relational algebra
 			optimizedAlgebra = optimizeQuery(translation.algebra);
@@ -109,7 +108,7 @@ export function parseSQL(input: string): ParseResult {
 			);
 
 			// Step 7: Generate Mermaid diagram for optimized algebra
-			mermaidOptimized = mermaidTranslator.translate({
+			mermaidOptimized = algebraToMermaid({
 				success: true,
 				algebra: optimizedAlgebra,
 			});

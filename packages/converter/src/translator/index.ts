@@ -4,7 +4,7 @@ export {
 	translationResultToString,
 } from "./ASTToAlgebraTranslator";
 export {
-	AlgebraToMermaidTranslator,
+	algebraToMermaid,
 	algebraToMermaidMarkdown,
 } from "./AlgebraToMermaidTranslator";
 export type * from "./types";

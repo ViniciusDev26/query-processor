@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-	AlgebraToMermaidTranslator,
+	algebraToMermaid,
 	algebraToMermaidMarkdown,
 } from "./AlgebraToMermaidTranslator";
 import type { TranslationResult } from "./types";
 
-describe("AlgebraToMermaidTranslator", () => {
+describe("algebraToMermaid", () => {
 	it("should translate simple Relation", () => {
 		const result: TranslationResult = {
 			success: true,
@@ -15,8 +15,7 @@ describe("AlgebraToMermaidTranslator", () => {
 			},
 		};
 
-		const translator = new AlgebraToMermaidTranslator();
-		const mermaid = translator.translate(result);
+		const mermaid = algebraToMermaid(result);
 
 		expect(mermaid).toContain("graph TD");
 		expect(mermaid).toContain("users");
@@ -35,8 +34,7 @@ describe("AlgebraToMermaidTranslator", () => {
 			},
 		};
 
-		const translator = new AlgebraToMermaidTranslator();
-		const mermaid = translator.translate(result);
+		const mermaid = algebraToMermaid(result);
 
 		expect(mermaid).toContain("graph TD");
 		expect(mermaid).toContain("π");
@@ -57,8 +55,7 @@ describe("AlgebraToMermaidTranslator", () => {
 			},
 		};
 
-		const translator = new AlgebraToMermaidTranslator();
-		const mermaid = translator.translate(result);
+		const mermaid = algebraToMermaid(result);
 
 		expect(mermaid).toContain("π");
 		expect(mermaid).toContain("\\*");
@@ -77,8 +74,7 @@ describe("AlgebraToMermaidTranslator", () => {
 			},
 		};
 
-		const translator = new AlgebraToMermaidTranslator();
-		const mermaid = translator.translate(result);
+		const mermaid = algebraToMermaid(result);
 
 		expect(mermaid).toContain("graph TD");
 		expect(mermaid).toContain("σ");
@@ -103,8 +99,7 @@ describe("AlgebraToMermaidTranslator", () => {
 			},
 		};
 
-		const translator = new AlgebraToMermaidTranslator();
-		const mermaid = translator.translate(result);
+		const mermaid = algebraToMermaid(result);
 
 		expect(mermaid).toContain("graph TD");
 		expect(mermaid).toContain("π");
@@ -121,8 +116,7 @@ describe("AlgebraToMermaidTranslator", () => {
 			details: ["Missing FROM clause"],
 		};
 
-		const translator = new AlgebraToMermaidTranslator();
-		const mermaid = translator.translate(result);
+		const mermaid = algebraToMermaid(result);
 
 		expect(mermaid).toContain("Error: Invalid query");
 	});
@@ -169,8 +163,7 @@ describe("AlgebraToMermaidTranslator", () => {
 			},
 		};
 
-		const translator = new AlgebraToMermaidTranslator();
-		const mermaid = translator.translate(result);
+		const mermaid = algebraToMermaid(result);
 
 		// Verify structure
 		expect(mermaid).toContain("graph TD");
@@ -224,8 +217,7 @@ describe("AlgebraToMermaidTranslator", () => {
 			},
 		};
 
-		const translator = new AlgebraToMermaidTranslator();
-		const mermaid = translator.translate(result);
+		const mermaid = algebraToMermaid(result);
 
 		// Verify structure
 		expect(mermaid).toContain("graph TD");
@@ -281,8 +273,7 @@ describe("AlgebraToMermaidTranslator", () => {
 			},
 		};
 
-		const translator = new AlgebraToMermaidTranslator();
-		const mermaid = translator.translate(result);
+		const mermaid = algebraToMermaid(result);
 
 		// Verify structure
 		expect(mermaid).toContain("graph TD");
