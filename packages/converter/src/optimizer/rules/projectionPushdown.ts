@@ -1,4 +1,4 @@
-import type { Projection, RelationalAlgebraNode, Selection } from '../../algebra/types';
+import type { Projection, RelationalAlgebraNode, Selection, Join, CrossProduct } from '../../algebra/types';
 import type { OptimizationRuleMetadata } from '../types';
 
 /**
@@ -29,6 +29,10 @@ function applyProjectionPushdown(node: RelationalAlgebraNode): RelationalAlgebra
       return optimizeProjection(node);
     case 'Selection':
       return optimizeSelectionForProjection(node);
+    case 'Join':
+      return optimizeJoinForProjection(node);
+    case 'CrossProduct':
+      return optimizeCrossProductForProjection(node);
     default:
       return node;
   }
@@ -285,6 +289,35 @@ function ensureProjectionAttributes(
   }
 
   return { attributes: result, changed };
+}
+
+/**
+ * Optimizes a Join node for projection pushdown.
+ *
+ * Strategy: Recursively optimize both sides of the join.
+ * In the future, could push down projections to each side based on which
+ * attributes they need.
+ */
+function optimizeJoinForProjection(node: Join): RelationalAlgebraNode {
+  return {
+    type: 'Join',
+    condition: node.condition,
+    left: applyProjectionPushdown(node.left),
+    right: applyProjectionPushdown(node.right)
+  };
+}
+
+/**
+ * Optimizes a CrossProduct node for projection pushdown.
+ *
+ * Strategy: Recursively optimize both sides of the cross product.
+ */
+function optimizeCrossProductForProjection(node: CrossProduct): RelationalAlgebraNode {
+  return {
+    type: 'CrossProduct',
+    left: applyProjectionPushdown(node.left),
+    right: applyProjectionPushdown(node.right)
+  };
 }
 
 /**

@@ -23,100 +23,94 @@ import type { OptimizationRuleMetadata } from '../types';
  * - FROM R, S (without WHERE condition) → cross product
  * - FROM R, S WHERE R.x = value AND S.y = value → still cross product
  * - FROM R, S WHERE R.id = S.ref_id → can be converted to join
- *
- * TODO: Implement cross product detection and elimination
- * CURRENT STATUS: Passthrough - returns input unchanged
- *
- * NOTE: Currently, the AST translator represents joins explicitly.
- * This rule is prepared for when cross products might be generated
- * or when implicit joins need to be optimized.
  */
 function applyCrossProductElimination(node: RelationalAlgebraNode): RelationalAlgebraNode {
-  // TODO: Remove this passthrough and implement the optimization
-  return node;
+  switch (node.type) {
+    case 'Relation':
+      return node;
 
-  // Estrutura para quando implementar:
-  // switch (node.type) {
-  //   case 'Relation':
-  //     return node;
-  //   case 'Selection':
-  //     return optimizeSelectionForCrossProduct(node);
-  //   case 'Projection':
-  //     return {
-  //       type: 'Projection',
-  //       attributes: node.attributes,
-  //       input: applyCrossProductElimination(node.input)
-  //     };
-  //   default:
-  //     return node;
-  // }
+    case 'Selection':
+      return optimizeSelectionForCrossProduct(node);
+
+    case 'Projection':
+      return {
+        type: 'Projection',
+        attributes: node.attributes,
+        input: applyCrossProductElimination(node.input)
+      };
+
+    case 'Join':
+      return {
+        type: 'Join',
+        condition: node.condition,
+        left: applyCrossProductElimination(node.left),
+        right: applyCrossProductElimination(node.right)
+      };
+
+    case 'CrossProduct':
+      // Cross product without a selection is unavoidable
+      // Just optimize its children
+      return {
+        type: 'CrossProduct',
+        left: applyCrossProductElimination(node.left),
+        right: applyCrossProductElimination(node.right)
+      };
+
+    default:
+      return node;
+  }
 }
 
 /**
  * Optimizes a Selection to detect and eliminate cross products.
  *
- * TODO: Implement the following:
- * 1. Check if the input is a cross product (when Cross Product type is added)
- * 2. Analyze the selection condition to find join predicates
- * 3. Separate join predicates from filter predicates
- * 4. Convert cross product + join predicate into a proper join
- * 5. Apply remaining filter predicates as selections
- *
- * Example transformation:
- * σ[R.id = S.ref_id AND R.status = 'active'](R × S)
- * →
- * σ[R.status = 'active'](R ⋈[id=ref_id] S)
+ * Transforms: σ[R.id = S.ref_id AND R.status = 'active'](R × S)
+ * Into: σ[R.status = 'active'](R ⋈[id=ref_id] S)
  */
 function optimizeSelectionForCrossProduct(selection: RelationalAlgebraNode): RelationalAlgebraNode {
-  // TODO: Check if input is a cross product
-  // if (selection.input.type === 'CrossProduct') {
-  //   const joinPredicates = extractJoinPredicates(selection.condition);
-  //   const filterPredicates = extractFilterPredicates(selection.condition);
-  //
-  //   if (joinPredicates.length > 0) {
-  //     // Convert to join + selection
-  //     const join = createJoin(
-  //       selection.input.left,
-  //       selection.input.right,
-  //       joinPredicates
-  //     );
-  //
-  //     if (filterPredicates.length > 0) {
-  //       return {
-  //         type: 'Selection',
-  //         condition: combinePredicates(filterPredicates),
-  //         input: join
-  //       };
-  //     }
-  //
-  //     return join;
-  //   }
-  // }
-
-  // For now, just recursively optimize
-  if (selection.type === 'Selection') {
-    return {
-      type: 'Selection',
-      condition: selection.condition,
-      input: applyCrossProductElimination(selection.input)
-    };
+  if (selection.type !== 'Selection') {
+    return selection;
   }
 
-  return selection;
+  // Check if the input is a cross product
+  if (selection.input.type === 'CrossProduct') {
+    const joinPredicates = extractJoinPredicates(selection.condition);
+    const filterPredicates = extractFilterPredicates(selection.condition);
+
+    if (joinPredicates.length > 0) {
+      // Convert to join + selection
+      const join = createJoin(
+        selection.input.left,
+        selection.input.right,
+        joinPredicates
+      );
+
+      // Apply remaining filter predicates
+      if (filterPredicates.length > 0) {
+        return {
+          type: 'Selection',
+          condition: combinePredicates(filterPredicates),
+          input: join
+        };
+      }
+
+      return join;
+    }
+  }
+
+  // Recursively optimize the input
+  return {
+    type: 'Selection',
+    condition: selection.condition,
+    input: applyCrossProductElimination(selection.input)
+  };
 }
 
 /**
  * Detects if a node represents a cross product.
- *
- * TODO: Implement detection for:
- * 1. Explicit CrossProduct nodes (when added to algebra types)
- * 2. Implicit cross products from multiple FROM tables without joins
- * 3. Nested cross products
  */
 function isCrossProduct(node: RelationalAlgebraNode): boolean {
-  // TODO: Check if node is a CrossProduct type
-  // return node.type === 'CrossProduct';
-  return false;
+  return node.type === 'CrossProduct';
 }
 
 /**
@@ -125,20 +119,35 @@ function isCrossProduct(node: RelationalAlgebraNode): boolean {
  * Join predicates are conditions that relate attributes from different relations.
  * Example: "R.id = S.ref_id" is a join predicate
  *          "R.status = 'active'" is a filter predicate
- *
- * TODO: Implement by:
- * 1. Parsing the condition string
- * 2. Identifying predicates that reference multiple relations
- * 3. Detecting equality conditions between table attributes
- * 4. Handling qualified attribute names (table.column)
  */
 function extractJoinPredicates(condition: string): string[] {
-  // TODO: Parse condition and find predicates like "R.attr = S.attr"
-  // Look for patterns:
-  // - table1.column = table2.column
-  // - table1.column = table2.column AND ...
+  const joinPreds: string[] = [];
 
-  return [];
+  // Split by AND to get individual predicates
+  const predicates = splitByAnd(condition);
+
+  for (const pred of predicates) {
+    // Look for equality patterns like "table1.col = table2.col"
+    const joinPattern = /(\w+\.\w+)\s*=\s*(\w+\.\w+)/;
+    const match = pred.match(joinPattern);
+
+    if (match) {
+      const leftParts = match[1].split('.');
+      const rightParts = match[2].split('.');
+
+      // Check if the table/relation names are different
+      if (leftParts.length === 2 && rightParts.length === 2) {
+        const leftTable = leftParts[0];
+        const rightTable = rightParts[0];
+
+        if (leftTable !== rightTable) {
+          joinPreds.push(pred.trim());
+        }
+      }
+    }
+  }
+
+  return joinPreds;
 }
 
 /**
@@ -147,38 +156,38 @@ function extractJoinPredicates(condition: string): string[] {
  * Filter predicates are conditions that only reference one relation.
  * Example: "R.status = 'active'" is a filter predicate
  *          "age > 18" is a filter predicate
- *
- * TODO: Implement by:
- * 1. Parsing the condition string
- * 2. Identifying predicates that reference only one relation
- * 3. Handling unqualified attribute names
  */
 function extractFilterPredicates(condition: string): string[] {
-  // TODO: Parse condition and find predicates that don't relate tables
-  return [];
+  const filterPreds: string[] = [];
+
+  // Split by AND to get individual predicates
+  const predicates = splitByAnd(condition);
+  const joinPreds = new Set(extractJoinPredicates(condition));
+
+  for (const pred of predicates) {
+    // If it's not a join predicate, it's a filter predicate
+    if (!joinPreds.has(pred.trim())) {
+      filterPreds.push(pred.trim());
+    }
+  }
+
+  return filterPreds;
 }
 
 /**
  * Creates a join node from two relations and join conditions.
- *
- * TODO: Implement when Join type is added to RelationalAlgebraNode
  */
 function createJoin(
   left: RelationalAlgebraNode,
   right: RelationalAlgebraNode,
   conditions: string[]
 ): RelationalAlgebraNode {
-  // TODO: Create a Join node
-  // return {
-  //   type: 'Join',
-  //   joinType: 'INNER',
-  //   left,
-  //   right,
-  //   condition: conditions.join(' AND ')
-  // };
-
-  // For now, return the left relation (placeholder)
-  return left;
+  return {
+    type: 'Join',
+    condition: conditions.join(' AND '),
+    left: applyCrossProductElimination(left),
+    right: applyCrossProductElimination(right)
+  };
 }
 
 /**
@@ -189,56 +198,79 @@ function combinePredicates(predicates: string[]): string {
 }
 
 /**
- * Analyzes a query plan to find unavoidable cross products and warn about them.
- *
- * TODO: Implement analysis that:
- * 1. Traverses the entire query plan
- * 2. Identifies cross products that cannot be eliminated
- * 3. Estimates the cost (|R| × |S|)
- * 4. Returns warnings or suggestions
+ * Splits a condition string by AND operator.
+ * Handles nested parentheses and string literals.
  */
-function analyzeCrossProducts(node: RelationalAlgebraNode): string[] {
-  const warnings: string[] = [];
+function splitByAnd(condition: string): string[] {
+  // Remove leading/trailing whitespace
+  condition = condition.trim();
 
-  // TODO: Traverse the tree and detect cross products
-  // if (isCrossProduct(node)) {
-  //   warnings.push(
-  //     `Warning: Cross product detected. This may be very expensive. ` +
-  //     `Consider adding join conditions.`
-  //   );
-  // }
+  const predicates: string[] = [];
+  let current = '';
+  let parenDepth = 0;
+  let inString = false;
+  let stringChar = '';
 
-  return warnings;
+  for (let i = 0; i < condition.length; i++) {
+    const char = condition[i];
+
+    // Handle string literals
+    if ((char === "'" || char === '"') && (i === 0 || condition[i - 1] !== '\\')) {
+      if (!inString) {
+        inString = true;
+        stringChar = char;
+      } else if (char === stringChar) {
+        inString = false;
+      }
+      current += char;
+      continue;
+    }
+
+    if (inString) {
+      current += char;
+      continue;
+    }
+
+    // Track parentheses depth
+    if (char === '(') {
+      parenDepth++;
+      current += char;
+      continue;
+    }
+
+    if (char === ')') {
+      parenDepth--;
+      current += char;
+      continue;
+    }
+
+    // Check for AND keyword (only at depth 0)
+    if (parenDepth === 0) {
+      const remaining = condition.substring(i);
+      const andMatch = remaining.match(/^(AND|and)\s+/i);
+
+      if (andMatch) {
+        // Found an AND separator
+        if (current.trim()) {
+          predicates.push(current.trim());
+        }
+        current = '';
+        i += andMatch[0].length - 1; // -1 because loop will increment
+        continue;
+      }
+    }
+
+    current += char;
+  }
+
+  // Add the last predicate
+  if (current.trim()) {
+    predicates.push(current.trim());
+  }
+
+  return predicates.length > 0 ? predicates : [condition];
 }
 
-/**
- * Future extension: Add CrossProduct type to algebra.
- *
- * TODO: When implementing joins, add to algebra/types.ts:
- *
- * ```typescript
- * export interface CrossProduct {
- *   type: "CrossProduct";
- *   left: RelationalAlgebraNode;
- *   right: RelationalAlgebraNode;
- * }
- *
- * export interface Join {
- *   type: "Join";
- *   joinType: "INNER" | "LEFT" | "RIGHT" | "FULL";
- *   left: RelationalAlgebraNode;
- *   right: RelationalAlgebraNode;
- *   condition: string;
- * }
- *
- * export type RelationalAlgebraNode =
- *   | Projection
- *   | Selection
- *   | Relation
- *   | Join
- *   | CrossProduct;
- * ```
- */
 
 /**
  * Cross product elimination optimization rule with metadata.

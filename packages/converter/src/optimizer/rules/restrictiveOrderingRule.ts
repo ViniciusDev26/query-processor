@@ -1,4 +1,4 @@
-import type { RelationalAlgebraNode, Selection } from '../../algebra/types';
+import type { RelationalAlgebraNode, Selection, Join, CrossProduct } from '../../algebra/types';
 import type { OptimizationRuleMetadata } from '../types';
 
 /**
@@ -24,12 +24,8 @@ import type { OptimizationRuleMetadata } from '../types';
  * Examples:
  * - σ[name LIKE '%son'](σ[id = 123](R)) → σ[id = 123](σ[name LIKE '%son'](R))
  * - σ[age > 18](σ[status = 'active'](R)) → σ[status = 'active'](σ[age > 18](R))
- *
- * TODO: Implement the reordering logic based on selectivity estimation
- * CURRENT STATUS: Passthrough - returns input unchanged
  */
 function applyRestrictiveOrdering(node: RelationalAlgebraNode): RelationalAlgebraNode {
-  // Estrutura para quando implementar:
   switch (node.type) {
     case 'Relation':
       return node;
@@ -40,6 +36,19 @@ function applyRestrictiveOrdering(node: RelationalAlgebraNode): RelationalAlgebr
         type: 'Projection',
         attributes: node.attributes,
         input: applyRestrictiveOrdering(node.input)
+      };
+    case 'Join':
+      return {
+        type: 'Join',
+        condition: node.condition,
+        left: applyRestrictiveOrdering(node.left),
+        right: applyRestrictiveOrdering(node.right)
+      };
+    case 'CrossProduct':
+      return {
+        type: 'CrossProduct',
+        left: applyRestrictiveOrdering(node.left),
+        right: applyRestrictiveOrdering(node.right)
       };
     default:
       return node;
