@@ -29,19 +29,19 @@
  * ```
  */
 
-// Fully implemented rules
-export { selectionPushdownRule } from './selectionPushdown';
+export { crossProductEliminationRule } from "./crossProductElimination";
 
 // Rules with structure ready for implementation (currently TODOs)
-export { projectionPushdownRule } from './projectionPushdown';
-export { restrictiveOrderingRule } from './restrictiveOrderingRule';
-export { crossProductEliminationRule } from './crossProductElimination';
+export { projectionPushdownRule } from "./projectionPushdown";
+export { restrictiveOrderingRule } from "./restrictiveOrderingRule";
+// Fully implemented rules
+export { selectionPushdownRule } from "./selectionPushdown";
 
-import type { OptimizationRuleMetadata } from '../types';
-import { selectionPushdownRule } from './selectionPushdown';
-import { projectionPushdownRule } from './projectionPushdown';
-import { restrictiveOrderingRule } from './restrictiveOrderingRule';
-import { crossProductEliminationRule } from './crossProductElimination';
+import type { OptimizationRuleMetadata } from "../types";
+import { crossProductEliminationRule } from "./crossProductElimination";
+import { projectionPushdownRule } from "./projectionPushdown";
+import { restrictiveOrderingRule } from "./restrictiveOrderingRule";
+import { selectionPushdownRule } from "./selectionPushdown";
 
 /**
  * Default set of optimization rules applied in order.
@@ -64,8 +64,8 @@ import { crossProductEliminationRule } from './crossProductElimination';
  * See IMPLEMENTATION_GUIDE.md for details on how to implement them.
  */
 export const DEFAULT_OPTIMIZATION_RULES: OptimizationRuleMetadata[] = [
-  crossProductEliminationRule,  // TODO: Currently passthrough
-  selectionPushdownRule,         // ✅ Fully implemented
-  restrictiveOrderingRule,       // TODO: Currently passthrough
-  projectionPushdownRule,        // TODO: Currently passthrough
+	crossProductEliminationRule, // TODO: Currently passthrough
+	selectionPushdownRule, // ✅ Fully implemented
+	restrictiveOrderingRule, // TODO: Currently passthrough
+	projectionPushdownRule, // TODO: Currently passthrough
 ];

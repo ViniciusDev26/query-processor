@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import type { Projection, Relation, Selection } from "../../algebra/types";
 import { selectionPushdownRule } from "./selectionPushdown";
-import type { RelationalAlgebraNode, Selection, Projection, Relation } from "../../algebra/types";
 
 describe("selectionPushdownRule", () => {
 	describe("metadata", () => {
@@ -16,7 +16,7 @@ describe("selectionPushdownRule", () => {
 		it("should not modify a simple relation", () => {
 			const relation: Relation = {
 				type: "Relation",
-				name: "users"
+				name: "users",
 			};
 
 			const result = selectionPushdownRule.apply(relation);
@@ -30,8 +30,8 @@ describe("selectionPushdownRule", () => {
 				condition: "age > 18",
 				input: {
 					type: "Relation",
-					name: "users"
-				}
+					name: "users",
+				},
 			};
 
 			const result = selectionPushdownRule.apply(query);
@@ -50,9 +50,9 @@ describe("selectionPushdownRule", () => {
 					attributes: ["name", "age"],
 					input: {
 						type: "Relation",
-						name: "users"
-					}
-				}
+						name: "users",
+					},
+				},
 			};
 
 			const result = selectionPushdownRule.apply(query);
@@ -72,7 +72,7 @@ describe("selectionPushdownRule", () => {
 					// Under the selection should be the Relation
 					expect(result.input.input).toEqual({
 						type: "Relation",
-						name: "users"
+						name: "users",
 					});
 				}
 			}
@@ -92,10 +92,10 @@ describe("selectionPushdownRule", () => {
 						attributes: ["a", "b", "c"],
 						input: {
 							type: "Relation",
-							name: "table1"
-						}
-					}
-				}
+							name: "table1",
+						},
+					},
+				},
 			};
 
 			const result = selectionPushdownRule.apply(query);
@@ -119,7 +119,7 @@ describe("selectionPushdownRule", () => {
 						expect(result.input.input.attributes).toEqual(["a", "b", "c"]);
 						expect(result.input.input.input).toEqual({
 							type: "Relation",
-							name: "table1"
+							name: "table1",
 						});
 					}
 				}
@@ -137,9 +137,9 @@ describe("selectionPushdownRule", () => {
 					condition: "city = 'NY'",
 					input: {
 						type: "Relation",
-						name: "users"
-					}
-				}
+						name: "users",
+					},
+				},
 			};
 
 			const result = selectionPushdownRule.apply(query);
@@ -154,7 +154,7 @@ describe("selectionPushdownRule", () => {
 					expect(result.input.condition).toBe("city = 'NY'");
 					expect(result.input.input).toEqual({
 						type: "Relation",
-						name: "users"
+						name: "users",
 					});
 				}
 			}
@@ -174,10 +174,10 @@ describe("selectionPushdownRule", () => {
 						attributes: ["x", "y"],
 						input: {
 							type: "Relation",
-							name: "data"
-						}
-					}
-				}
+							name: "data",
+						},
+					},
+				},
 			};
 
 			const result = selectionPushdownRule.apply(query);
@@ -198,7 +198,7 @@ describe("selectionPushdownRule", () => {
 						expect(result.input.input.attributes).toEqual(["x", "y"]);
 						expect(result.input.input.input).toEqual({
 							type: "Relation",
-							name: "data"
+							name: "data",
 						});
 					}
 				}
@@ -211,8 +211,8 @@ describe("selectionPushdownRule", () => {
 				attributes: ["name", "email"],
 				input: {
 					type: "Relation",
-					name: "users"
-				}
+					name: "users",
+				},
 			};
 
 			const result = selectionPushdownRule.apply(query);
@@ -229,9 +229,9 @@ describe("selectionPushdownRule", () => {
 					attributes: ["*"],
 					input: {
 						type: "Relation",
-						name: "users"
-					}
-				}
+						name: "users",
+					},
+				},
 			};
 
 			const result = selectionPushdownRule.apply(query);
@@ -240,7 +240,9 @@ describe("selectionPushdownRule", () => {
 			if (result.type === "Projection") {
 				expect(result.input.type).toBe("Selection");
 				if (result.input.type === "Selection") {
-					expect(result.input.condition).toBe("age > 18 AND city = 'NY' OR status = 'active'");
+					expect(result.input.condition).toBe(
+						"age > 18 AND city = 'NY' OR status = 'active'",
+					);
 				}
 			}
 		});
@@ -254,9 +256,9 @@ describe("selectionPushdownRule", () => {
 					attributes: ["*"],
 					input: {
 						type: "Relation",
-						name: "products"
-					}
-				}
+						name: "products",
+					},
+				},
 			};
 
 			const result = selectionPushdownRule.apply(query);
@@ -269,7 +271,7 @@ describe("selectionPushdownRule", () => {
 					expect(result.input.condition).toBe("status = 'active'");
 					expect(result.input.input).toEqual({
 						type: "Relation",
-						name: "products"
+						name: "products",
 					});
 				}
 			}
@@ -286,9 +288,9 @@ describe("selectionPushdownRule", () => {
 					attributes: [],
 					input: {
 						type: "Relation",
-						name: "items"
-					}
-				}
+						name: "items",
+					},
+				},
 			};
 
 			const result = selectionPushdownRule.apply(query);

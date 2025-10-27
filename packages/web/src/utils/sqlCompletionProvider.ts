@@ -1,6 +1,6 @@
 import {
-	getAutocompleteSuggestions,
 	type DatabaseSchema,
+	getAutocompleteSuggestions,
 } from "@query-processor/converter";
 import type { languages } from "monaco-editor";
 

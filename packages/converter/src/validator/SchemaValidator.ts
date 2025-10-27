@@ -79,7 +79,10 @@ export class SchemaValidator {
 				const actualJoinTableName = this.findTableName(join.table);
 				if (actualJoinTableName) {
 					const joinAlias = join.alias || actualJoinTableName;
-					this.availableTables.set(joinAlias.toLowerCase(), actualJoinTableName);
+					this.availableTables.set(
+						joinAlias.toLowerCase(),
+						actualJoinTableName,
+					);
 				}
 
 				// Validate ON condition
@@ -155,7 +158,9 @@ export class SchemaValidator {
 			actualColumnName = parts[1];
 
 			// Try to find table by alias first
-			const resolvedTable = this.availableTables.get(tableOrAlias.toLowerCase());
+			const resolvedTable = this.availableTables.get(
+				tableOrAlias.toLowerCase(),
+			);
 			if (!resolvedTable) {
 				this.errors.push({
 					type: "UNKNOWN_TABLE",
@@ -172,7 +177,7 @@ export class SchemaValidator {
 			// If we have multiple tables (JOINs), column reference is ambiguous
 			if (this.availableTables.size > 1) {
 				// Try to find the column in any of the available tables
-				let foundInTables: string[] = [];
+				const foundInTables: string[] = [];
 				for (const [, tblName] of this.availableTables) {
 					const actualTblName = this.findTableName(tblName);
 					if (!actualTblName) continue;
@@ -231,7 +236,10 @@ export class SchemaValidator {
 	/**
 	 * Find the actual column name in a table (case-insensitive lookup)
 	 */
-	private findColumnName(table: TableSchema, columnName: string): string | undefined {
+	private findColumnName(
+		table: TableSchema,
+		columnName: string,
+	): string | undefined {
 		const lowerColumnName = columnName.toLowerCase();
 		return Object.keys(table.columns).find(
 			(name) => name.toLowerCase() === lowerColumnName,
@@ -315,7 +323,9 @@ export class SchemaValidator {
 			actualColumnName = parts[1];
 
 			// Try to find table by alias first
-			const resolvedTable = this.availableTables.get(tableOrAlias.toLowerCase());
+			const resolvedTable = this.availableTables.get(
+				tableOrAlias.toLowerCase(),
+			);
 			if (!resolvedTable) {
 				this.errors.push({
 					type: "UNKNOWN_TABLE",

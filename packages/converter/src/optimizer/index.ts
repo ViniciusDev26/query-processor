@@ -1,6 +1,6 @@
-import type { RelationalAlgebraNode } from '../algebra/types';
-import type { OptimizationRule, OptimizationRuleMetadata } from './types';
-import { DEFAULT_OPTIMIZATION_RULES } from './rules';
+import type { RelationalAlgebraNode } from "../algebra/types";
+import { DEFAULT_OPTIMIZATION_RULES } from "./rules";
+import type { OptimizationRule, OptimizationRuleMetadata } from "./types";
 
 /**
  * Applies a sequence of optimization rules to a relational algebra tree.
@@ -10,17 +10,17 @@ import { DEFAULT_OPTIMIZATION_RULES } from './rules';
  * @returns Optimized relational algebra tree
  */
 export function optimizeQuery(
-  node: RelationalAlgebraNode,
-  rules: OptimizationRuleMetadata[] = DEFAULT_OPTIMIZATION_RULES
+	node: RelationalAlgebraNode,
+	rules: OptimizationRuleMetadata[] = DEFAULT_OPTIMIZATION_RULES,
 ): RelationalAlgebraNode {
-  // Apply each optimization rule in sequence
-  let optimized = node;
+	// Apply each optimization rule in sequence
+	let optimized = node;
 
-  for (const rule of rules) {
-    optimized = rule.apply(optimized);
-  }
+	for (const rule of rules) {
+		optimized = rule.apply(optimized);
+	}
 
-  return optimized;
+	return optimized;
 }
 
 /**
@@ -32,10 +32,10 @@ export function optimizeQuery(
  * @returns Optimized relational algebra tree
  */
 export function applyOptimizationRule(
-  node: RelationalAlgebraNode,
-  rule: OptimizationRule
+	node: RelationalAlgebraNode,
+	rule: OptimizationRule,
 ): RelationalAlgebraNode {
-  return rule(node);
+	return rule(node);
 }
 
 /**
@@ -43,29 +43,30 @@ export function applyOptimizationRule(
  * Uses standard relational algebra notation.
  */
 export function algebraToString(node: RelationalAlgebraNode): string {
-  switch (node.type) {
-    case 'Relation':
-      return node.name;
+	switch (node.type) {
+		case "Relation":
+			return node.name;
 
-    case 'Selection':
-      return `σ[${node.condition}](${algebraToString(node.input)})`;
+		case "Selection":
+			return `σ[${node.condition}](${algebraToString(node.input)})`;
 
-    case 'Projection': {
-      const attrs = node.attributes.length === 0 || node.attributes[0] === '*'
-        ? '*'
-        : node.attributes.join(', ');
-      return `π[${attrs}](${algebraToString(node.input)})`;
-    }
+		case "Projection": {
+			const attrs =
+				node.attributes.length === 0 || node.attributes[0] === "*"
+					? "*"
+					: node.attributes.join(", ");
+			return `π[${attrs}](${algebraToString(node.input)})`;
+		}
 
-    case 'Join':
-      return `(${algebraToString(node.left)} ⨝[${node.condition}] ${algebraToString(node.right)})`;
+		case "Join":
+			return `(${algebraToString(node.left)} ⨝[${node.condition}] ${algebraToString(node.right)})`;
 
-    case 'CrossProduct':
-      return `(${algebraToString(node.left)} × ${algebraToString(node.right)})`;
+		case "CrossProduct":
+			return `(${algebraToString(node.left)} × ${algebraToString(node.right)})`;
 
-    default:
-      return 'Unknown';
-  }
+		default:
+			return "Unknown";
+	}
 }
 
 /**
@@ -73,29 +74,30 @@ export function algebraToString(node: RelationalAlgebraNode): string {
  * Useful for debugging and understanding what changed.
  */
 export function explainOptimization(
-  original: RelationalAlgebraNode,
-  optimized: RelationalAlgebraNode
+	original: RelationalAlgebraNode,
+	optimized: RelationalAlgebraNode,
 ): string {
-  const originalStr = algebraToString(original);
-  const optimizedStr = algebraToString(optimized);
+	const originalStr = algebraToString(original);
+	const optimizedStr = algebraToString(optimized);
 
-  if (originalStr === optimizedStr) {
-    return 'No optimization needed - query is already optimal.';
-  }
+	if (originalStr === optimizedStr) {
+		return "No optimization needed - query is already optimal.";
+	}
 
-  const activeRules = DEFAULT_OPTIMIZATION_RULES
-    .filter(r => r.name === 'selection-pushdown') // Only fully implemented rule
-    .map(r => r.name);
+	const activeRules = DEFAULT_OPTIMIZATION_RULES.filter(
+		(r) => r.name === "selection-pushdown",
+	) // Only fully implemented rule
+		.map((r) => r.name);
 
-  const pendingRules = DEFAULT_OPTIMIZATION_RULES
-    .filter(r => r.name !== 'selection-pushdown')
-    .map(r => `${r.name} (TODO)`);
+	const pendingRules = DEFAULT_OPTIMIZATION_RULES.filter(
+		(r) => r.name !== "selection-pushdown",
+	).map((r) => `${r.name} (TODO)`);
 
-  const allRules = [...activeRules, ...pendingRules].join(', ');
+	const allRules = [...activeRules, ...pendingRules].join(", ");
 
-  return `Original:  ${originalStr}\nOptimized: ${optimizedStr}\n\nOptimizations available: ${allRules}`;
+	return `Original:  ${originalStr}\nOptimized: ${optimizedStr}\n\nOptimizations available: ${allRules}`;
 }
 
+export { DEFAULT_OPTIMIZATION_RULES } from "./rules";
 // Re-export types for convenience
-export type { OptimizationRule, OptimizationRuleMetadata } from './types';
-export { DEFAULT_OPTIMIZATION_RULES } from './rules';
+export type { OptimizationRule, OptimizationRuleMetadata } from "./types";

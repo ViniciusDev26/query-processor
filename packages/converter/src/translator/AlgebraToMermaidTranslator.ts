@@ -50,7 +50,9 @@ const generateNodeId = (context: MermaidContext): TranslationOutput => ({
 /**
  * Increments and returns the execution order
  */
-const nextExecutionOrder = (context: MermaidContext): { order: number; context: MermaidContext } => ({
+const nextExecutionOrder = (
+	context: MermaidContext,
+): { order: number; context: MermaidContext } => ({
 	order: context.executionOrder + 1,
 	context: { ...context, executionOrder: context.executionOrder + 1 },
 });
@@ -81,9 +83,10 @@ const formatNode = (
 
 	const [open, close] = shapeMap[shape];
 	const escapedLabel = escapeLabel(label);
-	const labelWithOrder = executionOrder !== undefined
-		? `${executionOrder}. ${escapedLabel}`
-		: escapedLabel;
+	const labelWithOrder =
+		executionOrder !== undefined
+			? `${executionOrder}. ${escapedLabel}`
+			: escapedLabel;
 
 	return `    ${id}${open}${labelWithOrder}${close}`;
 };
@@ -92,9 +95,7 @@ const formatNode = (
  * Formats an edge connection between two nodes
  */
 const formatEdge = (from: string, to: string, label?: string): string =>
-	label
-		? `    ${from} -->|"${label}"| ${to}`
-		: `    ${from} --> ${to}`;
+	label ? `    ${from} -->|"${label}"| ${to}` : `    ${from} --> ${to}`;
 
 /**
  * Adds a node to the context
@@ -147,12 +148,16 @@ const translateProjection = (
 	const { nodeId: projId, context: ctx1 } = generateNodeId(context);
 
 	// Translate input first (bottom-up execution)
-	const { nodeId: inputId, context: ctx2 } = translateAlgebraNode(node.input, ctx1);
+	const { nodeId: inputId, context: ctx2 } = translateAlgebraNode(
+		node.input,
+		ctx1,
+	);
 
 	// Format attributes
-	const attrs = node.attributes.length === 0 || node.attributes.includes("*")
-		? "\\*"
-		: node.attributes.join(", ");
+	const attrs =
+		node.attributes.length === 0 || node.attributes.includes("*")
+			? "\\*"
+			: node.attributes.join(", ");
 
 	// Add projection node with execution order
 	const { order, context: ctx3 } = nextExecutionOrder(ctx2);
@@ -174,7 +179,10 @@ const translateSelection = (
 	const { nodeId: selId, context: ctx1 } = generateNodeId(context);
 
 	// Translate input first (bottom-up execution)
-	const { nodeId: inputId, context: ctx2 } = translateAlgebraNode(node.input, ctx1);
+	const { nodeId: inputId, context: ctx2 } = translateAlgebraNode(
+		node.input,
+		ctx1,
+	);
 
 	// Add selection node with execution order
 	const { order, context: ctx3 } = nextExecutionOrder(ctx2);
@@ -196,8 +204,14 @@ const translateJoin = (
 	const { nodeId: joinId, context: ctx1 } = generateNodeId(context);
 
 	// Translate left and right inputs first (bottom-up execution)
-	const { nodeId: leftId, context: ctx2 } = translateAlgebraNode(node.left, ctx1);
-	const { nodeId: rightId, context: ctx3 } = translateAlgebraNode(node.right, ctx2);
+	const { nodeId: leftId, context: ctx2 } = translateAlgebraNode(
+		node.left,
+		ctx1,
+	);
+	const { nodeId: rightId, context: ctx3 } = translateAlgebraNode(
+		node.right,
+		ctx2,
+	);
 
 	// Add join node with execution order
 	const { order, context: ctx4 } = nextExecutionOrder(ctx3);
@@ -220,8 +234,14 @@ const translateCrossProduct = (
 	const { nodeId: crossId, context: ctx1 } = generateNodeId(context);
 
 	// Translate left and right inputs first (bottom-up execution)
-	const { nodeId: leftId, context: ctx2 } = translateAlgebraNode(node.left, ctx1);
-	const { nodeId: rightId, context: ctx3 } = translateAlgebraNode(node.right, ctx2);
+	const { nodeId: leftId, context: ctx2 } = translateAlgebraNode(
+		node.left,
+		ctx1,
+	);
+	const { nodeId: rightId, context: ctx3 } = translateAlgebraNode(
+		node.right,
+		ctx2,
+	);
 
 	// Add cross product node with execution order
 	const { order, context: ctx4 } = nextExecutionOrder(ctx3);
@@ -272,7 +292,10 @@ export const algebraToMermaid = (result: TranslationResult): string => {
 	}
 
 	// Translate the algebra tree
-	const { context: finalContext } = translateAlgebraNode(result.algebra, context);
+	const { context: finalContext } = translateAlgebraNode(
+		result.algebra,
+		context,
+	);
 
 	return finalContext.lines.join("\n");
 };

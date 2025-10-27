@@ -1,14 +1,14 @@
 import type { RelationalAlgebraNode } from "../algebra/types";
 import type {
-	SelectStatement,
+	BinaryExpression,
 	Column,
 	Expression,
-	BinaryExpression,
+	JoinClause,
 	LogicalExpression,
 	Operand,
-	TableSource,
+	SelectStatement,
 	SubquerySource,
-	JoinClause,
+	TableSource,
 } from "../ast/types";
 import type { TranslationResult } from "./types";
 

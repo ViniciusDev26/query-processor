@@ -27,7 +27,9 @@ export class SchemaValidationError extends Error {
 			return `Schema validation failed: ${errors[0].message}`;
 		}
 
-		const errorList = errors.map((err, idx) => `  ${idx + 1}. ${err.message}`).join("\n");
+		const errorList = errors
+			.map((err, idx) => `  ${idx + 1}. ${err.message}`)
+			.join("\n");
 		return `Schema validation failed with ${errors.length} errors:\n${errorList}`;
 	}
 

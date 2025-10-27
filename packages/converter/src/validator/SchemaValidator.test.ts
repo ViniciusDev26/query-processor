@@ -383,9 +383,7 @@ describe("SchemaValidator", () => {
 		});
 
 		it("should validate JOIN with table aliases", () => {
-			const ast = parse(
-				"SELECT * FROM users u JOIN products p ON u.id = p.id",
-			);
+			const ast = parse("SELECT * FROM users u JOIN products p ON u.id = p.id");
 			const errors = validator.validate(ast);
 			expect(errors).toHaveLength(0);
 		});

@@ -5,7 +5,9 @@
 	"type": "module",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
@@ -19,7 +21,12 @@
 		"test:watch": "vitest",
 		"prepublishOnly": "npm run build"
 	},
-	"keywords": ["sql", "relational-algebra", "parser", "converter"],
+	"keywords": [
+		"sql",
+		"relational-algebra",
+		"parser",
+		"converter"
+	],
 	"author": "",
 	"license": "ISC",
 	"devDependencies": {

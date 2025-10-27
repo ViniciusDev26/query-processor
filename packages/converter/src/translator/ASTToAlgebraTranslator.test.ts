@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ASTToAlgebraTranslator } from "./ASTToAlgebraTranslator";
 import type { SelectStatement } from "../ast/types";
+import { ASTToAlgebraTranslator } from "./ASTToAlgebraTranslator";
 
 describe("ASTToAlgebraTranslator", () => {
 	const translator = new ASTToAlgebraTranslator();

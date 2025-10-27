@@ -1,9 +1,16 @@
 // Re-export all tokens from their respective files
+
+export * from "./keywords";
 export * from "./literals";
 export * from "./operators";
-export * from "./keywords";
 
-import { Identifier, NumberLiteral, StringLiteral, WhiteSpace } from "./literals";
+import { And, As, From, Inner, Join, On, Or, Select, Where } from "./keywords";
+import {
+	Identifier,
+	NumberLiteral,
+	StringLiteral,
+	WhiteSpace,
+} from "./literals";
 import {
 	Comma,
 	Dot,
@@ -18,7 +25,6 @@ import {
 	Semicolon,
 	Star,
 } from "./operators";
-import { And, As, From, Inner, Join, On, Or, Select, Where } from "./keywords";
 
 // Token order matters! Keywords must come before Identifier
 // Comparison operators with multiple characters must come before single characters

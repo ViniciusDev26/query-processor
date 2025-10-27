@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { crossProductEliminationRule } from "./crossProductElimination";
 import type { RelationalAlgebraNode } from "../../algebra/types";
+import { crossProductEliminationRule } from "./crossProductElimination";
 
 describe("crossProductEliminationRule", () => {
 	it("should leave simple relation unchanged", () => {

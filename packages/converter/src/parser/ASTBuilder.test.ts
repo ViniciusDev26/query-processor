@@ -35,9 +35,9 @@ describe("ASTBuilder", () => {
 			expect((ast.columns[0] as StarColumn).type).toBe("StarColumn");
 			expect(ast.from.type).toBe("FromClause");
 			expect(ast.from.source.type).toBe("TableSource");
-		if (ast.from.source.type === "TableSource") {
-			expect(ast.from.source.table).toBe("users");
-		}
+			if (ast.from.source.type === "TableSource") {
+				expect(ast.from.source.table).toBe("users");
+			}
 			expect(ast.where).toBeUndefined();
 		});
 
@@ -49,9 +49,9 @@ describe("ASTBuilder", () => {
 			expect((ast.columns[0] as NamedColumn).type).toBe("NamedColumn");
 			expect((ast.columns[0] as NamedColumn).name).toBe("id");
 			expect(ast.from.source.type).toBe("TableSource");
-		if (ast.from.source.type === "TableSource") {
-			expect(ast.from.source.table).toBe("users");
-		}
+			if (ast.from.source.type === "TableSource") {
+				expect(ast.from.source.table).toBe("users");
+			}
 		});
 
 		it("should build AST for SELECT with multiple columns", () => {
@@ -137,9 +137,7 @@ describe("ASTBuilder", () => {
 		});
 
 		it("should build AST with OR condition", () => {
-			const ast = parseToAST(
-				"SELECT * FROM users WHERE age < 18 OR age > 65",
-			);
+			const ast = parseToAST("SELECT * FROM users WHERE age < 18 OR age > 65");
 
 			const condition = ast.where?.condition as LogicalExpression;
 			expect(condition.type).toBe("LogicalExpression");

@@ -53,7 +53,9 @@ export function createASTBuilder(parser: SQLParser) {
 				throw new Error("fromSource is not a CstNode array");
 			}
 
-			const source = this.visit(fromSourceNodes) as TableSource | SubquerySource;
+			const source = this.visit(fromSourceNodes) as
+				| TableSource
+				| SubquerySource;
 
 			const from: FromClause = {
 				type: "FromClause",

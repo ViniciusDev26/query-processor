@@ -3,11 +3,10 @@ import { SQLParseError } from "./SQLParseError";
 
 describe("SQLParseError", () => {
 	it("should create error with correct properties", () => {
-		const error = new SQLParseError(
-			"Test error",
-			"lexer",
-			["detail 1", "detail 2"],
-		);
+		const error = new SQLParseError("Test error", "lexer", [
+			"detail 1",
+			"detail 2",
+		]);
 
 		expect(error.message).toBe("Test error");
 		expect(error.name).toBe("SQLParseError");

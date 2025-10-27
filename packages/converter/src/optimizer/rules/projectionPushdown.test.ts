@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { Projection, Relation, Selection, RelationalAlgebraNode } from "../../algebra/types";
+import type {
+	Projection,
+	Relation,
+	RelationalAlgebraNode,
+	Selection,
+} from "../../algebra/types";
 import { projectionPushdownRule } from "./projectionPushdown";
 
 describe("projectionPushdownRule", () => {
@@ -360,7 +365,9 @@ describe("projectionPushdownRule", () => {
 			expect(result.attributes).toEqual(["name", "price", "category"]);
 			expect(result.input.type).toBe("Selection");
 			if (result.input.type === "Selection") {
-				expect(result.input.condition).toBe("price > 100 AND category = 'electronics' AND stock > 0");
+				expect(result.input.condition).toBe(
+					"price > 100 AND category = 'electronics' AND stock > 0",
+				);
 			}
 		}
 	});

@@ -1,4 +1,4 @@
-import type { RelationalAlgebraNode } from '../algebra/types';
+import type { RelationalAlgebraNode } from "../algebra/types";
 
 /**
  * An optimization rule that transforms a relational algebra tree.
@@ -11,22 +11,24 @@ import type { RelationalAlgebraNode } from '../algebra/types';
  * @param node - The input relational algebra tree
  * @returns The optimized relational algebra tree
  */
-export type OptimizationRule = (node: RelationalAlgebraNode) => RelationalAlgebraNode;
+export type OptimizationRule = (
+	node: RelationalAlgebraNode,
+) => RelationalAlgebraNode;
 
 /**
  * Metadata about an optimization rule.
  * Useful for debugging and explaining what optimizations were applied.
  */
 export interface OptimizationRuleMetadata {
-  /** Unique identifier for the rule */
-  name: string;
+	/** Unique identifier for the rule */
+	name: string;
 
-  /** Human-readable description of what the rule does */
-  description: string;
+	/** Human-readable description of what the rule does */
+	description: string;
 
-  /** Category of optimization (e.g., "heuristic", "cost-based") */
-  category: 'heuristic' | 'cost-based' | 'logical';
+	/** Category of optimization (e.g., "heuristic", "cost-based") */
+	category: "heuristic" | "cost-based" | "logical";
 
-  /** The optimization function */
-  apply: OptimizationRule;
+	/** The optimization function */
+	apply: OptimizationRule;
 }

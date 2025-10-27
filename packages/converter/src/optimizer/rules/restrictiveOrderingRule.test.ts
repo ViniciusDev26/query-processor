@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { restrictiveOrderingRule } from "./restrictiveOrderingRule";
 import type { RelationalAlgebraNode } from "../../algebra/types";
+import { restrictiveOrderingRule } from "./restrictiveOrderingRule";
 
 describe("restrictiveOrderingRule", () => {
 	it("should leave simple relation unchanged", () => {

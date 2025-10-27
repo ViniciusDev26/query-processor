@@ -1,18 +1,23 @@
+import type { RelationalAlgebraNode } from "./algebra/types";
 import type { SelectStatement, Statement } from "./ast/types";
 import { SQLLexer } from "./lexer/SQLLexer";
+import {
+	algebraToString,
+	explainOptimization,
+	optimizeQuery,
+} from "./optimizer";
 import { createASTBuilder } from "./parser/ASTBuilder";
 import { SQLParser } from "./parser/SQLParser";
 import {
 	ASTToAlgebraTranslator,
-	translationResultToString,
 	algebraToMermaid,
+	translationResultToString,
 } from "./translator";
 import type { TranslationResult } from "./translator/types";
 import { SchemaValidator } from "./validator/SchemaValidator";
 import type { DatabaseSchema, ValidationError } from "./validator/types";
-import { optimizeQuery, algebraToString, explainOptimization } from "./optimizer";
-import type { RelationalAlgebraNode } from "./algebra/types";
 
+export type * from "./algebra/types";
 // Re-export types
 export type * from "./ast/types";
 export type * from "./autocomplete";
@@ -25,16 +30,19 @@ export {
 } from "./autocomplete";
 export { SQLParseError } from "./errors";
 export {
+	algebraToString,
+	explainOptimization,
+	optimizeQuery,
+} from "./optimizer";
+export {
 	ASTToAlgebraTranslator,
-	translationResultToString,
 	algebraToMermaid,
 	algebraToMermaidMarkdown,
+	translationResultToString,
 } from "./translator";
 export type * from "./translator/types";
 export { SchemaValidationError } from "./validator/SchemaValidationError";
 export type * from "./validator/types";
-export { optimizeQuery, algebraToString, explainOptimization } from "./optimizer";
-export type * from "./algebra/types";
 
 export interface ParseSuccess {
 	success: true;
@@ -104,7 +112,7 @@ export function parseSQL(input: string): ParseResult {
 			optimizedAlgebraString = algebraToString(optimizedAlgebra);
 			optimizationExplanation = explainOptimization(
 				translation.algebra,
-				optimizedAlgebra
+				optimizedAlgebra,
 			);
 
 			// Step 7: Generate Mermaid diagram for optimized algebra

@@ -1,5 +1,5 @@
-import type { RelationalAlgebraNode, Selection, Join, CrossProduct } from '../../algebra/types';
-import type { OptimizationRuleMetadata } from '../types';
+import type { RelationalAlgebraNode, Selection } from "../../algebra/types";
+import type { OptimizationRuleMetadata } from "../types";
 
 /**
  * Reorders selections and joins to apply the most restrictive operations first.
@@ -25,34 +25,36 @@ import type { OptimizationRuleMetadata } from '../types';
  * - σ[name LIKE '%son'](σ[id = 123](R)) → σ[id = 123](σ[name LIKE '%son'](R))
  * - σ[age > 18](σ[status = 'active'](R)) → σ[status = 'active'](σ[age > 18](R))
  */
-function applyRestrictiveOrdering(node: RelationalAlgebraNode): RelationalAlgebraNode {
-  switch (node.type) {
-    case 'Relation':
-      return node;
-    case 'Selection':
-      return optimizeSelectionOrder(node);
-    case 'Projection':
-      return {
-        type: 'Projection',
-        attributes: node.attributes,
-        input: applyRestrictiveOrdering(node.input)
-      };
-    case 'Join':
-      return {
-        type: 'Join',
-        condition: node.condition,
-        left: applyRestrictiveOrdering(node.left),
-        right: applyRestrictiveOrdering(node.right)
-      };
-    case 'CrossProduct':
-      return {
-        type: 'CrossProduct',
-        left: applyRestrictiveOrdering(node.left),
-        right: applyRestrictiveOrdering(node.right)
-      };
-    default:
-      return node;
-  }
+function applyRestrictiveOrdering(
+	node: RelationalAlgebraNode,
+): RelationalAlgebraNode {
+	switch (node.type) {
+		case "Relation":
+			return node;
+		case "Selection":
+			return optimizeSelectionOrder(node);
+		case "Projection":
+			return {
+				type: "Projection",
+				attributes: node.attributes,
+				input: applyRestrictiveOrdering(node.input),
+			};
+		case "Join":
+			return {
+				type: "Join",
+				condition: node.condition,
+				left: applyRestrictiveOrdering(node.left),
+				right: applyRestrictiveOrdering(node.right),
+			};
+		case "CrossProduct":
+			return {
+				type: "CrossProduct",
+				left: applyRestrictiveOrdering(node.left),
+				right: applyRestrictiveOrdering(node.right),
+			};
+		default:
+			return node;
+	}
 }
 
 /**
@@ -65,37 +67,40 @@ function applyRestrictiveOrdering(node: RelationalAlgebraNode): RelationalAlgebr
  * 4. Rebuild the selection chain in the new order
  */
 function optimizeSelectionOrder(selection: Selection): RelationalAlgebraNode {
-  // Collect all consecutive selections
-  const selections: Selection[] = [];
-  let current: RelationalAlgebraNode = selection;
+	// Collect all consecutive selections
+	const selections: Selection[] = [];
+	let current: RelationalAlgebraNode = selection;
 
-  while (current.type === 'Selection') {
-    selections.push(current);
-    current = current.input;
-  }
+	while (current.type === "Selection") {
+		selections.push(current);
+		current = current.input;
+	}
 
-  // Recursively optimize the input (the non-selection node at the bottom)
-  const optimizedBase = applyRestrictiveOrdering(current);
+	// Recursively optimize the input (the non-selection node at the bottom)
+	const optimizedBase = applyRestrictiveOrdering(current);
 
-  // If we have multiple selections, reorder them
-  if (selections.length > 1) {
-    // Sort selections by estimated selectivity (most restrictive first)
-    const sortedSelections = sortBySelectivity(selections);
+	// If we have multiple selections, reorder them
+	if (selections.length > 1) {
+		// Sort selections by estimated selectivity (most restrictive first)
+		const sortedSelections = sortBySelectivity(selections);
 
-    // Rebuild the selection chain from the bottom up, starting with the optimized base
-    return sortedSelections.reduceRight((acc, sel) => ({
-      type: 'Selection',
-      condition: sel.condition,
-      input: acc
-    }), optimizedBase);
-  }
+		// Rebuild the selection chain from the bottom up, starting with the optimized base
+		return sortedSelections.reduceRight(
+			(acc, sel) => ({
+				type: "Selection",
+				condition: sel.condition,
+				input: acc,
+			}),
+			optimizedBase,
+		);
+	}
 
-  // Only one selection, just return it on top of the optimized base
-  return {
-    type: 'Selection',
-    condition: selection.condition,
-    input: optimizedBase
-  };
+	// Only one selection, just return it on top of the optimized base
+	return {
+		type: "Selection",
+		condition: selection.condition,
+		input: optimizedBase,
+	};
 }
 
 /**
@@ -119,50 +124,54 @@ function optimizeSelectionOrder(selection: Selection): RelationalAlgebraNode {
  * - "name LIKE '%pattern%'" → 0.8 (not selective)
  */
 function estimateSelectivity(condition: string): number {
-  // TODO: Analyze the condition string to estimate selectivity
+	// TODO: Analyze the condition string to estimate selectivity
 
-  // Simple heuristics to get started:
-  // 1. Check for equality operators
-  if (condition.includes(' = ')) {
-    // Equality is generally more selective
-    if (condition.toLowerCase().includes('id')) {
-      return 0.001; // Very selective on ID
-    }
-    return 0.1; // Moderately selective
-  }
+	// Simple heuristics to get started:
+	// 1. Check for equality operators
+	if (condition.includes(" = ")) {
+		// Equality is generally more selective
+		if (condition.toLowerCase().includes("id")) {
+			return 0.001; // Very selective on ID
+		}
+		return 0.1; // Moderately selective
+	}
 
-  // 2. Check for inequality operators
-  if (condition.includes(' > ') || condition.includes(' < ') ||
-      condition.includes(' >= ') || condition.includes(' <= ')) {
-    return 0.5; // Less selective
-  }
+	// 2. Check for inequality operators
+	if (
+		condition.includes(" > ") ||
+		condition.includes(" < ") ||
+		condition.includes(" >= ") ||
+		condition.includes(" <= ")
+	) {
+		return 0.5; // Less selective
+	}
 
-  // 3. Check for LIKE operators
-  if (condition.toLowerCase().includes(' like ')) {
-    // Check for leading wildcard (more expensive, less selective)
-    // Pattern: LIKE '%...' or LIKE "%..."
-    if (condition.match(/like\s+['"]%/i)) {
-      return 0.8; // Not very selective with leading wildcard
-    }
-    // Has wildcard but not leading (more selective - can use index prefix scan)
-    if (condition.includes('%')) {
-      return 0.3; // More selective without leading wildcard
-    }
-    return 0.3; // No wildcard at all, most selective LIKE
-  }
+	// 3. Check for LIKE operators
+	if (condition.toLowerCase().includes(" like ")) {
+		// Check for leading wildcard (more expensive, less selective)
+		// Pattern: LIKE '%...' or LIKE "%..."
+		if (condition.match(/like\s+['"]%/i)) {
+			return 0.8; // Not very selective with leading wildcard
+		}
+		// Has wildcard but not leading (more selective - can use index prefix scan)
+		if (condition.includes("%")) {
+			return 0.3; // More selective without leading wildcard
+		}
+		return 0.3; // No wildcard at all, most selective LIKE
+	}
 
-  // 4. Check for BETWEEN
-  if (condition.toLowerCase().includes(' between ')) {
-    return 0.3; // Moderately selective
-  }
+	// 4. Check for BETWEEN
+	if (condition.toLowerCase().includes(" between ")) {
+		return 0.3; // Moderately selective
+	}
 
-  // 5. Check for IN operator
-  if (condition.toLowerCase().includes(' in ')) {
-    return 0.2; // Depends on the list size
-  }
+	// 5. Check for IN operator
+	if (condition.toLowerCase().includes(" in ")) {
+		return 0.2; // Depends on the list size
+	}
 
-  // Default: assume moderate selectivity
-  return 0.5;
+	// Default: assume moderate selectivity
+	return 0.5;
 }
 
 /**
@@ -171,12 +180,12 @@ function estimateSelectivity(condition: string): number {
  * TODO: Implement proper sorting based on selectivity estimation
  */
 function sortBySelectivity(selections: Selection[]): Selection[] {
-  // TODO: Sort by selectivity (lower selectivity = more restrictive = should come first)
-  return selections.sort((a, b) => {
-    const selectivityA = estimateSelectivity(a.condition);
-    const selectivityB = estimateSelectivity(b.condition);
-    return selectivityA - selectivityB;
-  });
+	// TODO: Sort by selectivity (lower selectivity = more restrictive = should come first)
+	return selections.sort((a, b) => {
+		const selectivityA = estimateSelectivity(a.condition);
+		const selectivityB = estimateSelectivity(b.condition);
+		return selectivityA - selectivityB;
+	});
 }
 
 /**
@@ -192,17 +201,18 @@ function sortBySelectivity(selections: Selection[]): Selection[] {
  * - (R ⋈ S) ⋈ T where |R ⋈ S| is large
  * - → R ⋈ (S ⋈ T) if |S ⋈ T| is smaller
  */
-function reorderJoins(node: RelationalAlgebraNode): RelationalAlgebraNode {
-  // TODO: Implement when Join type is added to the algebra
-  return node;
+function _reorderJoins(node: RelationalAlgebraNode): RelationalAlgebraNode {
+	// TODO: Implement when Join type is added to the algebra
+	return node;
 }
 
 /**
  * Restrictive ordering optimization rule with metadata.
  */
 export const restrictiveOrderingRule: OptimizationRuleMetadata = {
-  name: 'restrictive-ordering',
-  description: 'Reorders selections and joins to apply the most restrictive operations first',
-  category: 'heuristic',
-  apply: applyRestrictiveOrdering
+	name: "restrictive-ordering",
+	description:
+		"Reorders selections and joins to apply the most restrictive operations first",
+	category: "heuristic",
+	apply: applyRestrictiveOrdering,
 };

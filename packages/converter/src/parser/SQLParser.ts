@@ -1,8 +1,8 @@
 import { CstParser } from "chevrotain";
 import {
-	allTokens,
 	And,
 	As,
+	allTokens,
 	Comma,
 	Dot,
 	Equals,

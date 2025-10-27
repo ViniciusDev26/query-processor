@@ -3,9 +3,9 @@
  * Provides autocomplete suggestions based on the SQL grammar and schema
  */
 
+import { parseSQL, type SelectStatement, type TableSource } from "../index";
 import { allTokens } from "../lexer/tokens";
 import type { DatabaseSchema } from "../validator/types";
-import { parseSQL, type SelectStatement, type TableSource } from "../index";
 
 export interface AutocompleteSuggestion {
 	label: string;
@@ -116,9 +116,8 @@ function analyzeContext(sqlText: string) {
 	// Detect context using regex for incomplete queries
 	context.isAfterSelect = /\bSELECT\s*$/i.test(sqlText);
 	context.isAfterFrom = /\bFROM\s*$/i.test(sqlText);
-	context.isAfterJoin = /\b(?:JOIN|INNER\s+JOIN|LEFT\s+JOIN|RIGHT\s+JOIN)\s*$/i.test(
-		sqlText,
-	);
+	context.isAfterJoin =
+		/\b(?:JOIN|INNER\s+JOIN|LEFT\s+JOIN|RIGHT\s+JOIN)\s*$/i.test(sqlText);
 	context.isAfterWhere = /\bWHERE\s+(?:\w+\s+)?$/i.test(sqlText);
 
 	// Try to extract table from incomplete FROM

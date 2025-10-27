@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { optimizeQuery, algebraToString, explainOptimization } from "./index";
-import type { RelationalAlgebraNode, Selection, Projection, Relation } from "../algebra/types";
+import type {
+	Projection,
+	Relation,
+	RelationalAlgebraNode,
+	Selection,
+} from "../algebra/types";
+import { algebraToString, explainOptimization, optimizeQuery } from "./index";
 
 describe("Optimizer", () => {
 	describe("optimizeQuery", () => {
 		it("should keep a simple relation unchanged", () => {
 			const relation: Relation = {
 				type: "Relation",
-				name: "users"
+				name: "users",
 			};
 
 			const result = optimizeQuery(relation);
@@ -21,8 +26,8 @@ describe("Optimizer", () => {
 				condition: "age > 18",
 				input: {
 					type: "Relation",
-					name: "users"
-				}
+					name: "users",
+				},
 			};
 
 			const result = optimizeQuery(query);
@@ -43,9 +48,9 @@ describe("Optimizer", () => {
 					attributes: ["name", "age"],
 					input: {
 						type: "Relation",
-						name: "users"
-					}
-				}
+						name: "users",
+					},
+				},
 			};
 
 			const result = optimizeQuery(query);
@@ -60,7 +65,7 @@ describe("Optimizer", () => {
 					expect(result.input.condition).toBe("age > 18");
 					expect(result.input.input).toEqual({
 						type: "Relation",
-						name: "users"
+						name: "users",
 					});
 				}
 			}
@@ -77,9 +82,9 @@ describe("Optimizer", () => {
 					condition: "name = 'John'",
 					input: {
 						type: "Relation",
-						name: "users"
-					}
-				}
+						name: "users",
+					},
+				},
 			};
 
 			const result = optimizeQuery(query);
@@ -92,7 +97,7 @@ describe("Optimizer", () => {
 					expect(result.input.condition).toBe("age > 18");
 					expect(result.input.input).toEqual({
 						type: "Relation",
-						name: "users"
+						name: "users",
 					});
 				}
 			}
@@ -108,9 +113,9 @@ describe("Optimizer", () => {
 					condition: "id = 123",
 					input: {
 						type: "Relation",
-						name: "users"
-					}
-				}
+						name: "users",
+					},
+				},
 			};
 
 			const result = optimizeQuery(query);
@@ -123,7 +128,7 @@ describe("Optimizer", () => {
 					expect(result.input.condition).toBe("age > 18");
 					expect(result.input.input).toEqual({
 						type: "Relation",
-						name: "users"
+						name: "users",
 					});
 				}
 			}
@@ -140,9 +145,9 @@ describe("Optimizer", () => {
 					attributes: ["name", "age"],
 					input: {
 						type: "Relation",
-						name: "users"
-					}
-				}
+						name: "users",
+					},
+				},
 			};
 
 			const optimized = optimizeQuery(query);
@@ -158,8 +163,8 @@ describe("Optimizer", () => {
 				attributes: ["name", "email"],
 				input: {
 					type: "Relation",
-					name: "users"
-				}
+					name: "users",
+				},
 			};
 
 			const result = optimizeQuery(query);
@@ -172,7 +177,7 @@ describe("Optimizer", () => {
 		it("should convert relation to string", () => {
 			const relation: Relation = {
 				type: "Relation",
-				name: "users"
+				name: "users",
 			};
 
 			expect(algebraToString(relation)).toBe("users");
@@ -184,8 +189,8 @@ describe("Optimizer", () => {
 				condition: "age > 18",
 				input: {
 					type: "Relation",
-					name: "users"
-				}
+					name: "users",
+				},
 			};
 
 			expect(algebraToString(selection)).toBe("σ[age > 18](users)");
@@ -197,8 +202,8 @@ describe("Optimizer", () => {
 				attributes: ["name", "age"],
 				input: {
 					type: "Relation",
-					name: "users"
-				}
+					name: "users",
+				},
 			};
 
 			expect(algebraToString(projection)).toBe("π[name, age](users)");
@@ -210,8 +215,8 @@ describe("Optimizer", () => {
 				attributes: ["*"],
 				input: {
 					type: "Relation",
-					name: "users"
-				}
+					name: "users",
+				},
 			};
 
 			expect(algebraToString(projection)).toBe("π[*](users)");
@@ -226,9 +231,9 @@ describe("Optimizer", () => {
 					condition: "age > 18",
 					input: {
 						type: "Relation",
-						name: "users"
-					}
-				}
+						name: "users",
+					},
+				},
 			};
 
 			expect(algebraToString(query)).toBe("π[name](σ[age > 18](users))");
@@ -242,8 +247,8 @@ describe("Optimizer", () => {
 				condition: "age > 18",
 				input: {
 					type: "Relation",
-					name: "users"
-				}
+					name: "users",
+				},
 			};
 
 			const optimized = optimizeQuery(query);
@@ -261,9 +266,9 @@ describe("Optimizer", () => {
 					attributes: ["name", "age"],
 					input: {
 						type: "Relation",
-						name: "users"
-					}
-				}
+						name: "users",
+					},
+				},
 			};
 
 			const optimized = optimizeQuery(original);

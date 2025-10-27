@@ -2,12 +2,7 @@
 	"$schema": "https://json.schemastore.org/tsconfig",
 	"_version": "22.0.0",
 	"compilerOptions": {
-		"lib": [
-			"es2024",
-			"ESNext.Array",
-			"ESNext.Collection",
-			"ESNext.Iterator"
-		],
+		"lib": ["es2024", "ESNext.Array", "ESNext.Collection", "ESNext.Iterator"],
 		"module": "esnext",
 		"target": "es2022",
 		"strict": true,
@@ -19,17 +14,9 @@
 		"declaration": true,
 		"declarationMap": true,
 		"paths": {
-			"@/*": [
-				"./src/*"
-			]
+			"@/*": ["./src/*"]
 		}
 	},
-	"include": [
-		"src"
-	],
-	"exclude": [
-		"node_modules",
-		"dist",
-		"**/*.test.ts"
-	]
+	"include": ["src"],
+	"exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
