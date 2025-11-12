@@ -60,7 +60,7 @@ function App() {
 		}
 
 		// Generate Mermaid diagrams
-		if (result.translation.success && result.optimization) {
+		if (result.translation.success) {
 			const originalDiagram = algebraToMermaidMarkdown(result.translation);
 			const optimizedDiagram = algebraToMermaidMarkdown({
 				success: true,
@@ -68,8 +68,8 @@ function App() {
 			});
 
 			setQueryResult({
-				originalAlgebra: result.translationString || "",
-				optimizedAlgebra: result.optimizationString || "",
+				originalAlgebra: result.translationString,
+				optimizedAlgebra: result.optimizationString,
 				originalDiagram,
 				optimizedDiagram,
 				appliedRules: result.optimization.appliedRules,

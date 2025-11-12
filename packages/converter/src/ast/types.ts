@@ -70,10 +70,10 @@ export interface SubquerySource {
 
 export interface JoinClause {
 	type: "JoinClause";
-	joinType: "INNER";
+	joinType: "INNER" | "CROSS";
 	table: string;
 	alias?: string;
-	on: Expression;
+	on?: Expression; // Optional for CROSS JOIN
 }
 
 export interface WhereClause {

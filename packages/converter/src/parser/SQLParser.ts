@@ -4,6 +4,7 @@ import {
 	And,
 	As,
 	Comma,
+	Cross,
 	Dot,
 	Equals,
 	From,
@@ -101,18 +102,21 @@ export class SQLParser extends CstParser {
 		});
 	});
 
-	// [INNER] JOIN table [AS alias] ON condition
+	// [INNER | CROSS] JOIN table [AS alias] [ON condition]
 	private joinClause = this.RULE("joinClause", () => {
-		this.OPTION(() => {
-			this.CONSUME(Inner);
+		const isCrossJoin = this.OPTION(() => {
+			this.OR([
+				{ ALT: () => this.CONSUME(Inner) },
+				{ ALT: () => this.CONSUME(Cross) },
+			]);
 		});
 		this.CONSUME(Join);
-		this.OR([
+		this.OR2([
 			{ ALT: () => this.CONSUME(Identifier) },
 			{ ALT: () => this.CONSUME(StringLiteral) },
 		]);
 		this.OPTION2(() => {
-			this.OR2([
+			this.OR3([
 				{
 					ALT: () => {
 						this.CONSUME(As);
@@ -122,8 +126,11 @@ export class SQLParser extends CstParser {
 				{ ALT: () => this.CONSUME3(Identifier) },
 			]);
 		});
-		this.CONSUME(On);
-		this.SUBRULE(this.orExpression);
+		// ON clause is optional for CROSS JOIN
+		this.OPTION3(() => {
+			this.CONSUME(On);
+			this.SUBRULE(this.orExpression);
+		});
 	});
 
 	// WHERE condition

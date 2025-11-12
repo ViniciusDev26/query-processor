@@ -1,8 +1,8 @@
 import type { RelationalAlgebraNode } from "../algebra/types";
-import { pushDownSelections } from "./optimizations/pushDownSelections";
-import { pushDownProjections } from "./optimizations/pushDownProjections";
 import { applyMostRestrictiveFirst } from "./optimizations/applyMostRestrictiveFirst";
 import { avoidCartesianProduct } from "./optimizations/avoidCartesianProduct";
+import { pushDownProjections } from "./optimizations/pushDownProjections";
+import { pushDownSelections } from "./optimizations/pushDownSelections";
 import type { OptimizationResult } from "./types";
 import { OptimizationHeuristic } from "./types";
 
@@ -27,9 +27,10 @@ import { OptimizationHeuristic } from "./types";
  * Type definition for optimization functions
  * All optimization functions must follow this signature
  */
-type OptimizationFunction = (
-	node: RelationalAlgebraNode,
-) => { node: RelationalAlgebraNode; appliedRules: string[] };
+type OptimizationFunction = (node: RelationalAlgebraNode) => {
+	node: RelationalAlgebraNode;
+	appliedRules: string[];
+};
 
 export class RelationalAlgebraOptimizer {
 	private appliedRules: string[] = [];

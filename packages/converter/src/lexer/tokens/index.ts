@@ -17,7 +17,7 @@ import {
 	RParen,
 	Star,
 } from "./operators";
-import { And, As, From, Inner, Join, On, Or, Select, Where } from "./keywords";
+import { And, As, Cross, From, Inner, Join, On, Or, Select, Where } from "./keywords";
 
 // Token order matters! Keywords must come before Identifier
 // Comparison operators with multiple characters must come before single characters
@@ -32,6 +32,7 @@ export const allTokens = [
 	As,
 	Join,
 	Inner,
+	Cross,
 	On,
 	// Literals
 	NumberLiteral,

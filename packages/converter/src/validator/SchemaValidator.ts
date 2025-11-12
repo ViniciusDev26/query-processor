@@ -82,8 +82,10 @@ export class SchemaValidator {
 					this.availableTables.set(joinAlias.toLowerCase(), actualJoinTableName);
 				}
 
-				// Validate ON condition
-				this.validateExpression(join.on);
+				// Validate ON condition (if present - not required for CROSS JOIN)
+				if (join.on) {
+					this.validateExpression(join.on);
+				}
 			}
 		}
 

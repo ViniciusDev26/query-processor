@@ -42,6 +42,11 @@ export const Inner = createToken({
 	pattern: /INNER/i,
 	longer_alt: Identifier,
 });
+export const Cross = createToken({
+	name: "Cross",
+	pattern: /CROSS/i,
+	longer_alt: Identifier,
+});
 export const On = createToken({
 	name: "On",
 	pattern: /ON/i,

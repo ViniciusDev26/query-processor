@@ -40,8 +40,8 @@ export interface ParseSuccess {
 	ast: Statement;
 	translation: TranslationResult;
 	translationString: string;
-	optimization?: OptimizationResult;
-	optimizationString?: string;
+	optimization: OptimizationResult;
+	optimizationString: string;
 }
 
 export interface ParseError {
@@ -80,25 +80,8 @@ export function parseSQL(input: string): ParseResult {
 	const ast = astBuilder.visit(cst) as Statement;
 
 	// Step 4: Translate to Relational Algebra (only for SELECT statements)
-	let translation: TranslationResult;
-	let optimization: OptimizationResult | undefined;
-	let optimizationString: string | undefined;
-
-	if (ast.type === "SelectStatement") {
-		const translator = new ASTToAlgebraTranslator();
-		translation = translator.translate(ast as SelectStatement);
-
-		// Step 5: Optimize the relational algebra tree (if translation succeeded)
-		if (translation.success) {
-			const optimizer = new RelationalAlgebraOptimizer();
-			optimization = optimizer.optimize(translation.algebra);
-			optimizationString = translationResultToString({
-				success: true,
-				algebra: optimization.optimized,
-			});
-		}
-	} else {
-		translation = {
+	if (ast.type !== "SelectStatement") {
+		return {
 			success: false,
 			error: "Translation not supported",
 			details: [
@@ -107,6 +90,25 @@ export function parseSQL(input: string): ParseResult {
 		};
 	}
 
+	const translator = new ASTToAlgebraTranslator();
+	const translation = translator.translate(ast as SelectStatement);
+
+	// If translation failed, return error
+	if (!translation.success) {
+		return {
+			success: false,
+			error: translation.error,
+			details: translation.details,
+		};
+	}
+
+	// Step 5: Optimize the relational algebra tree
+	const optimizer = new RelationalAlgebraOptimizer();
+	const optimization = optimizer.optimize(translation.algebra);
+	const optimizationString = translationResultToString({
+		success: true,
+		algebra: optimization.optimized,
+	});
 	const translationString = translationResultToString(translation);
 
 	return {

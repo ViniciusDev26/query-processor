@@ -160,6 +160,12 @@ export function createASTBuilder(parser: SQLParser) {
 		}
 
 		joinClause(ctx: CstContext): JoinClause {
+			// Determine join type
+			let joinType: "INNER" | "CROSS" = "INNER";
+			if (ctx.Cross) {
+				joinType = "CROSS";
+			}
+
 			// Table name can be either Identifier or StringLiteral
 			let tableName: string;
 			if (ctx.Identifier) {
@@ -175,9 +181,9 @@ export function createASTBuilder(parser: SQLParser) {
 
 			const join: JoinClause = {
 				type: "JoinClause",
-				joinType: "INNER",
+				joinType,
 				table: tableName,
-				on: {} as Expression, // Will be set below
+				on: {} as Expression, // Will be set below for INNER JOIN
 			};
 
 			// Handle alias: either "AS alias" or implicit "alias"
@@ -188,17 +194,16 @@ export function createASTBuilder(parser: SQLParser) {
 				}
 			}
 
-			// Handle ON condition
-			if (!ctx.orExpression) {
-				throw new Error("Missing ON condition in joinClause");
+			// Handle ON condition (required for INNER JOIN, optional for CROSS JOIN)
+			if (ctx.orExpression) {
+				const orExpressionNodes = ctx.orExpression;
+				if (!isCstNodeArray(orExpressionNodes)) {
+					throw new Error("orExpression is not a CstNode array");
+				}
+				join.on = this.visit(orExpressionNodes) as Expression;
+			} else if (joinType === "INNER") {
+				throw new Error("Missing ON condition in INNER JOIN");
 			}
-
-			const orExpressionNodes = ctx.orExpression;
-			if (!isCstNodeArray(orExpressionNodes)) {
-				throw new Error("orExpression is not a CstNode array");
-			}
-
-			join.on = this.visit(orExpressionNodes) as Expression;
 
 			return join;
 		}

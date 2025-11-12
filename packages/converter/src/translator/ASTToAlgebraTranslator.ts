@@ -120,19 +120,32 @@ export class ASTToAlgebraTranslator {
 		let result = base;
 
 		for (const join of joins) {
-			// Build the condition string for the JOIN
-			const condition = this.buildConditionString(join.on);
-
-			// Create a Join node with left (current result) and right (join table)
-			result = {
-				type: "Join",
-				condition,
-				left: result,
-				right: {
-					type: "Relation",
-					name: join.table,
-				},
+			const rightRelation: RelationalAlgebraNode = {
+				type: "Relation",
+				name: join.table,
 			};
+
+			// Handle CROSS JOIN (cartesian product) vs regular JOIN
+			if (join.joinType === "CROSS") {
+				// Create CrossProduct node
+				result = {
+					type: "CrossProduct",
+					left: result,
+					right: rightRelation,
+				};
+			} else {
+				// Create Join node with condition for INNER JOIN
+				if (!join.on) {
+					throw new Error("INNER JOIN requires an ON condition");
+				}
+				const condition = this.buildConditionString(join.on);
+				result = {
+					type: "Join",
+					condition,
+					left: result,
+					right: rightRelation,
+				};
+			}
 		}
 
 		return result;
