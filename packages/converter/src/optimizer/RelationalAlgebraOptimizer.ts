@@ -72,6 +72,7 @@ export class RelationalAlgebraOptimizer {
 		this.appliedRules = [];
 
 		// If no heuristics specified, apply all available heuristics
+		// The order matters! See OptimizationHeuristic enum for details
 		const heuristicsToApply =
 			heuristics ?? Object.values(OptimizationHeuristic);
 

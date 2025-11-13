@@ -15,6 +15,7 @@ export interface PushDownSelectionsResult {
  * Decomposes a compound AND condition into individual predicates
  * Example: "TB1.id > 300 AND TB3.sal != 0" → ["TB1.id > 300", "TB3.sal != 0"]
  * Example: "(TB1.id > 300 AND TB3.sal != 0)" → ["TB1.id > 300", "TB3.sal != 0"]
+ * Example: "(((A AND B) AND C) AND D)" → ["A", "B", "C", "D"] (recursive decomposition)
  */
 function decomposeAndCondition(condition: string): string[] {
 	// First, strip outer parentheses if present
@@ -68,7 +69,19 @@ function decomposeAndCondition(condition: string): string[] {
 		predicates.push(currentPredicate.trim());
 	}
 
-	return predicates.length > 0 ? predicates : [cleaned];
+	// If we only got one predicate back, return it
+	if (predicates.length <= 1) {
+		return predicates.length > 0 ? predicates : [cleaned];
+	}
+
+	// Recursively decompose each predicate to handle nested parentheses
+	const fullyDecomposed: string[] = [];
+	for (const predicate of predicates) {
+		const decomposed = decomposeAndCondition(predicate);
+		fullyDecomposed.push(...decomposed);
+	}
+
+	return fullyDecomposed;
 }
 
 /**
@@ -100,18 +113,44 @@ function extractRelationNames(node: RelationalAlgebraNode): Set<string> {
 
 /**
  * Checks if a predicate references any of the given relations
+ * Case-insensitive comparison to handle SQL's case-insensitive identifiers
  */
 function predicateReferences(
 	predicate: string,
 	relations: Set<string>,
 ): boolean {
+	const predicateLower = predicate.toLowerCase();
 	for (const relation of relations) {
 		// Check for qualified column references like "TB1.id" or "users.age"
-		if (predicate.includes(`${relation}.`)) {
+		// Use case-insensitive comparison since SQL identifiers are typically case-insensitive
+		if (predicateLower.includes(`${relation.toLowerCase()}.`)) {
 			return true;
 		}
 	}
 	return false;
+}
+
+/**
+ * Extracts all qualified column references from a condition
+ * Example: "TB1.id > 300 AND TB2.name = 'test'" → ["TB1.id", "TB2.name"]
+ */
+function extractAttributes(condition: string): string[] {
+	const attributes: string[] = [];
+
+	// First, remove string literals to avoid matching patterns inside them
+	// Replace single-quoted strings with placeholders
+	const withoutStrings = condition.replace(/'[^']*'/g, "''");
+
+	// Match qualified column references like "table.column"
+	const regex = /\b([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)\b/g;
+	let match: RegExpExecArray | null;
+
+	// biome-ignore lint: while with assignment is intentional
+	while ((match = regex.exec(withoutStrings)) !== null) {
+		attributes.push(match[1]);
+	}
+
+	return Array.from(new Set(attributes)); // Remove duplicates
 }
 
 /**
@@ -162,27 +201,43 @@ export function pushDownSelections(
 	function optimizeSelection(node: Selection): RelationalAlgebraNode {
 		const input = node.input;
 
-		// Rule: σ[c](π[a](R)) → π[a](σ[c](R))
-		// Push selection through projection if possible
+		// Rule: σ[c](π[a](R)) → π[a∪attrs(c)](σ[c](R))
+		// Push selection through projection, ensuring projection includes attributes needed by selection
 		if (input.type === "Projection") {
 			const projection = input as Projection;
 
-			// Check if all columns in the selection condition are still available
-			// after the projection (simplified check - assumes condition is valid)
-			const optimizedInput = optimize(projection.input);
+			// Extract attributes referenced in the selection condition
+			const selectionAttrs = extractAttributes(node.condition);
 
-			appliedRules.push(
-				"Push selection through projection: σ[c](π[a](R)) → π[a](σ[c](R))",
+			// Merge projection attributes with selection attributes, removing duplicates
+			const allAttributes = Array.from(
+				new Set([...projection.attributes, ...selectionAttrs]),
 			);
+
+			// Only add rule if we actually modified something
+			if (allAttributes.length !== projection.attributes.length) {
+				appliedRules.push(
+					`Push selection through projection and add required attributes: σ[${node.condition}] through π`,
+				);
+			} else {
+				appliedRules.push(
+					"Push selection through projection: σ[c](π[a](R)) → π[a](σ[c](R))",
+				);
+			}
+
+			// Create the new selection node and recursively optimize it to push it down further
+			const newSelection: Selection = {
+				type: "Selection",
+				condition: node.condition,
+				input: projection.input,
+			};
+
+			const optimizedSelection = optimize(newSelection);
 
 			return {
 				type: "Projection",
-				attributes: projection.attributes,
-				input: {
-					type: "Selection",
-					condition: node.condition,
-					input: optimizedInput,
-				},
+				attributes: allAttributes,
+				input: optimizedSelection,
 			};
 		}
 
@@ -220,20 +275,20 @@ export function pushDownSelections(
 							? ({
 									type: "Join",
 									condition: (binary as Join).condition,
-									left: {
+									left: optimize({
 										type: "Selection",
 										condition: predicates[0],
-										input: optimize(binary.left),
-									},
+										input: binary.left,
+									} as Selection),
 									right: optimize(binary.right),
 								} as Join)
 							: ({
 									type: "CrossProduct",
-									left: {
+									left: optimize({
 										type: "Selection",
 										condition: predicates[0],
-										input: optimize(binary.left),
-									},
+										input: binary.left,
+									} as Selection),
 									right: optimize(binary.right),
 								} as CrossProduct);
 
@@ -252,20 +307,20 @@ export function pushDownSelections(
 									type: "Join",
 									condition: (binary as Join).condition,
 									left: optimize(binary.left),
-									right: {
+									right: optimize({
 										type: "Selection",
 										condition: predicates[0],
-										input: optimize(binary.right),
-									},
+										input: binary.right,
+									} as Selection),
 								} as Join)
 							: ({
 									type: "CrossProduct",
 									left: optimize(binary.left),
-									right: {
+									right: optimize({
 										type: "Selection",
 										condition: predicates[0],
-										input: optimize(binary.right),
-									},
+										input: binary.right,
+									} as Selection),
 								} as CrossProduct);
 
 					return optimizedBinary;

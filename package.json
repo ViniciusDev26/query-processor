@@ -10,7 +10,8 @@
 		"build": "npm run build --workspaces",
 		"test": "npm run test --workspaces",
 		"test:converter": "npm run test:watch --workspace=@query-processor/converter",
-		"dev": "npm run dev --workspace=@query-processor/web"
+		"dev": "npm run dev --workspace=@query-processor/web",
+		"lint": "biome check . --unsafe"
 	},
 	"keywords": [],
 	"author": "",

@@ -66,6 +66,7 @@ function getRelationNames(node: RelationalAlgebraNode): Set<string> {
 
 /**
  * Checks if an attribute belongs to a specific side of a join
+ * Case-insensitive comparison to handle SQL's case-insensitive identifiers
  */
 function attributeBelongsToSide(
 	attr: string,
@@ -73,8 +74,14 @@ function attributeBelongsToSide(
 ): boolean {
 	// If it's qualified (table.column), check if the table is in the side
 	if (attr.includes(".")) {
-		const tableName = attr.split(".")[0];
-		return sideRelations.has(tableName);
+		const tableName = attr.split(".")[0].toLowerCase();
+		// Case-insensitive comparison
+		for (const relation of sideRelations) {
+			if (relation.toLowerCase() === tableName) {
+				return true;
+			}
+		}
+		return false;
 	}
 	// If unqualified, we can't determine, so assume it might belong
 	return true;
@@ -199,6 +206,11 @@ export function pushDownProjections(
 			};
 		}
 
+		// Note: π[a](σ[c](R)) is already optimal!
+		// In relational algebra trees, the innermost operation executes first.
+		// So π[a](σ[c](R)) means: apply σ first, then π - which is the correct order.
+		// We should NOT push projections through selections.
+
 		// For other cases, recursively optimize the input
 		const optimizedInput = optimize(input);
 
@@ -278,11 +290,13 @@ export function pushDownProjections(
 				appliedRules.push(
 					`Push projection on left side of join: π[${leftAttrs.join(", ")}]`,
 				);
-				optimizedLeft = {
+				// Create projection and recursively optimize it to push it down further
+				const newProjection: Projection = {
 					type: "Projection",
 					attributes: leftAttrs,
 					input: optimizedLeft,
 				};
+				optimizedLeft = optimize(newProjection);
 			}
 		}
 
@@ -302,11 +316,13 @@ export function pushDownProjections(
 				appliedRules.push(
 					`Push projection on right side of join: π[${rightAttrs.join(", ")}]`,
 				);
-				optimizedRight = {
+				// Create projection and recursively optimize it to push it down further
+				const newProjection: Projection = {
 					type: "Projection",
 					attributes: rightAttrs,
 					input: optimizedRight,
 				};
+				optimizedRight = optimize(newProjection);
 			}
 		}
 
