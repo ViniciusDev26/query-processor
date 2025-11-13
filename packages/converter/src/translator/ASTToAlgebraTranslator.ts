@@ -166,9 +166,11 @@ export class ASTToAlgebraTranslator {
 			const attrs = node.attributes.join(", ");
 			return `π[${attrs}](${this.nodeToString(node.input)})`;
 		} else if (node.type === "Join") {
-			return `⨝[${node.condition}](${this.nodeToString(node.left)}, ${this.nodeToString(node.right)})`;
+			// Notação teórica: R ⨝[condição] S (operador infixo)
+			return `${this.nodeToString(node.left)} ⨝[${node.condition}] ${this.nodeToString(node.right)}`;
 		} else if (node.type === "CrossProduct") {
-			return `(${this.nodeToString(node.left)} × ${this.nodeToString(node.right)})`;
+			// Notação teórica: R × S (operador infixo)
+			return `${this.nodeToString(node.left)} × ${this.nodeToString(node.right)}`;
 		}
 		return "unknown";
 	}
