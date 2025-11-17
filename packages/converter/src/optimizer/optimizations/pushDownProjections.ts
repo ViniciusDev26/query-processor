@@ -88,6 +88,56 @@ function attributeBelongsToSide(
 }
 
 /**
+ * Collects all attributes referenced in a subtree (from selections, projections)
+ * This is used to determine which attributes need to be preserved when pushing
+ * projections down through joins.
+ *
+ * NOTE: We DON'T collect attributes from selections because those are only needed
+ * for filtering and can be discarded after the selection is applied.
+ */
+function collectAttributesFromSubtree(node: RelationalAlgebraNode): Set<string> {
+	const attributes = new Set<string>();
+
+	function traverse(n: RelationalAlgebraNode): void {
+		switch (n.type) {
+			case "Selection":
+				// DON'T add attributes from selection - they're only needed for filtering
+				// Continue traversing to find projections and joins below
+				traverse(n.input);
+				break;
+			case "Projection":
+				// Add attributes from the projection
+				for (const attr of n.attributes) {
+					if (attr !== "*") {
+						attributes.add(attr);
+					}
+				}
+				traverse(n.input);
+				break;
+			case "Join":
+				// Add attributes from join condition
+				const joinAttrs = extractAttributesFromCondition(n.condition);
+				for (const attr of joinAttrs) {
+					attributes.add(attr);
+				}
+				traverse(n.left);
+				traverse(n.right);
+				break;
+			case "CrossProduct":
+				traverse(n.left);
+				traverse(n.right);
+				break;
+			case "Relation":
+				// Base case - no attributes to collect
+				break;
+		}
+	}
+
+	traverse(node);
+	return attributes;
+}
+
+/**
  * Heuristic 2: Push projections down
  *
  * Moves projection operations closer to the base relations to reduce
@@ -245,10 +295,17 @@ export function pushDownProjections(
 		// Get attributes needed for the join condition
 		const joinAttrs = extractAttributesFromCondition(node.condition);
 
-		// If parent specified needed attributes, combine with join attributes
-		const allNeededAttrs = neededAttrs
-			? new Set([...neededAttrs, ...joinAttrs])
-			: joinAttrs;
+		// Collect attributes from the subtrees (e.g., from selections pushed down)
+		const leftSubtreeAttrs = collectAttributesFromSubtree(node.left);
+		const rightSubtreeAttrs = collectAttributesFromSubtree(node.right);
+
+		// Combine all needed attributes: parent needs + join condition + subtree needs
+		const allNeededAttrs = new Set([
+			...joinAttrs,
+			...leftSubtreeAttrs,
+			...rightSubtreeAttrs,
+			...(neededAttrs || []),
+		]);
 
 		// Get relation names from each side
 		const leftRelations = getRelationNames(node.left);
@@ -281,22 +338,37 @@ export function pushDownProjections(
 		} else {
 			optimizedLeft = optimize(node.left);
 
-			// Only add projection if it's not a join (to avoid redundant projections)
-			if (
-				leftAttrs.length > 0 &&
-				allNeededAttrs.size > 0 &&
-				optimizedLeft.type !== "Projection"
-			) {
-				appliedRules.push(
-					`Push projection on left side of join: π[${leftAttrs.join(", ")}]`,
-				);
-				// Create projection and recursively optimize it to push it down further
-				const newProjection: Projection = {
-					type: "Projection",
-					attributes: leftAttrs,
-					input: optimizedLeft,
-				};
-				optimizedLeft = optimize(newProjection);
+			// Check if we need to add or update projection
+			if (leftAttrs.length > 0 && allNeededAttrs.size > 0) {
+				if (optimizedLeft.type === "Projection") {
+					// There's already a projection - check if it has all needed attributes
+					const existingProj = optimizedLeft as Projection;
+					const existingAttrs = new Set(existingProj.attributes);
+					const missingAttrs = leftAttrs.filter((attr) => !existingAttrs.has(attr));
+
+					if (missingAttrs.length > 0) {
+						// Update the projection to include missing attributes
+						appliedRules.push(
+							`Add missing attributes to existing projection: ${missingAttrs.join(", ")}`,
+						);
+						optimizedLeft = {
+							type: "Projection",
+							attributes: Array.from(new Set([...existingProj.attributes, ...leftAttrs])),
+							input: existingProj.input,
+						};
+					}
+				} else {
+					// No projection exists - create one
+					appliedRules.push(
+						`Push projection on left side of join: π[${leftAttrs.join(", ")}]`,
+					);
+					const newProjection: Projection = {
+						type: "Projection",
+						attributes: leftAttrs,
+						input: optimizedLeft,
+					};
+					optimizedLeft = optimize(newProjection);
+				}
 			}
 		}
 
@@ -307,22 +379,37 @@ export function pushDownProjections(
 		} else {
 			optimizedRight = optimize(node.right);
 
-			// Only add projection if it's not a join (to avoid redundant projections)
-			if (
-				rightAttrs.length > 0 &&
-				allNeededAttrs.size > 0 &&
-				optimizedRight.type !== "Projection"
-			) {
-				appliedRules.push(
-					`Push projection on right side of join: π[${rightAttrs.join(", ")}]`,
-				);
-				// Create projection and recursively optimize it to push it down further
-				const newProjection: Projection = {
-					type: "Projection",
-					attributes: rightAttrs,
-					input: optimizedRight,
-				};
-				optimizedRight = optimize(newProjection);
+			// Check if we need to add or update projection
+			if (rightAttrs.length > 0 && allNeededAttrs.size > 0) {
+				if (optimizedRight.type === "Projection") {
+					// There's already a projection - check if it has all needed attributes
+					const existingProj = optimizedRight as Projection;
+					const existingAttrs = new Set(existingProj.attributes);
+					const missingAttrs = rightAttrs.filter((attr) => !existingAttrs.has(attr));
+
+					if (missingAttrs.length > 0) {
+						// Update the projection to include missing attributes
+						appliedRules.push(
+							`Add missing attributes to existing projection: ${missingAttrs.join(", ")}`,
+						);
+						optimizedRight = {
+							type: "Projection",
+							attributes: Array.from(new Set([...existingProj.attributes, ...rightAttrs])),
+							input: existingProj.input,
+						};
+					}
+				} else {
+					// No projection exists - create one
+					appliedRules.push(
+						`Push projection on right side of join: π[${rightAttrs.join(", ")}]`,
+					);
+					const newProjection: Projection = {
+						type: "Projection",
+						attributes: rightAttrs,
+						input: optimizedRight,
+					};
+					optimizedRight = optimize(newProjection);
+				}
 			}
 		}
 
