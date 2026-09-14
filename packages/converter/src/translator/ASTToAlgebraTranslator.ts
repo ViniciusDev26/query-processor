@@ -103,7 +103,9 @@ export class ASTToAlgebraTranslator {
 			return this.translateSubquery((from.source as SubquerySource).subquery);
 		}
 
-		throw new Error(`Unknown FROM source type: ${from.source.type}`);
+		throw new Error(
+			`Unknown FROM source type: ${(from.source as { type: string }).type}`,
+		);
 	}
 
 	/**
@@ -208,7 +210,9 @@ export class ASTToAlgebraTranslator {
 			return `(${left} ${log.operator} ${right})`;
 		}
 
-		throw new Error(`Unknown expression type: ${expression.type}`);
+		throw new Error(
+			`Unknown expression type: ${(expression as { type: string }).type}`,
+		);
 	}
 
 	/**
@@ -226,7 +230,9 @@ export class ASTToAlgebraTranslator {
 			return `'${operand.value}'`;
 		}
 
-		throw new Error(`Unknown operand type: ${operand.type}`);
+		throw new Error(
+			`Unknown operand type: ${(operand as { type: string }).type}`,
+		);
 	}
 
 	/**
