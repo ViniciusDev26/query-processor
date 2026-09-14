@@ -5,6 +5,7 @@ import type {
 	RelationalAlgebraNode,
 	Selection,
 } from "@/algebra/types";
+import { getRelationNames } from "../../algebra/utils";
 
 export interface ApplyMostRestrictiveFirstResult {
 	node: RelationalAlgebraNode;
@@ -103,9 +104,7 @@ export function applyMostRestrictiveFirst(
 			const innerSelection = input as Selection;
 
 			const outerSelectivity = estimateSelectivity(node.condition);
-			const innerSelectivity = estimateSelectivity(
-				innerSelection.condition,
-			);
+			const innerSelectivity = estimateSelectivity(innerSelection.condition);
 
 			// If outer is more restrictive than inner, swap them
 			if (outerSelectivity < innerSelectivity) {
@@ -156,15 +155,32 @@ export function applyMostRestrictiveFirst(
 	/**
 	 * Optimize join nodes
 	 *
-	 * Could be extended to reorder join operands based on estimated sizes
+	 * Reorders operands so the side estimated to be smaller (fewer base
+	 * relations feeding it) comes first, which benefits join algorithms that
+	 * build their in-memory structure from the left operand (e.g. hash join).
+	 * This is a coarse proxy for relation size since the optimizer has no
+	 * cardinality statistics to work with.
 	 */
 	function optimizeJoin(node: Join): RelationalAlgebraNode {
 		// Recursively optimize both sides
 		const optimizedLeft = optimize(node.left);
 		const optimizedRight = optimize(node.right);
 
-		// Future optimization: swap operands if right is smaller than left
-		// For now, just optimize recursively
+		const leftSize = getRelationNames(optimizedLeft).size;
+		const rightSize = getRelationNames(optimizedRight).size;
+
+		if (rightSize < leftSize) {
+			appliedRules.push(
+				`Reorder join operands: smaller side first (${rightSize} relation(s) vs ${leftSize})`,
+			);
+
+			return {
+				type: "Join",
+				condition: node.condition,
+				left: optimizedRight,
+				right: optimizedLeft,
+			};
+		}
 
 		return {
 			type: "Join",

@@ -20,7 +20,7 @@ import type {
 } from "../ast/types";
 import type { SQLParser } from "./SQLParser";
 import type { CstContext } from "./types";
-import { isCstNodeArray } from "./utils";
+import { isCstNodeArray, unescapeStringLiteral } from "./utils";
 
 export function createASTBuilder(parser: SQLParser) {
 	const BaseSQLVisitor = parser.getBaseCstVisitorConstructor();
@@ -53,7 +53,9 @@ export function createASTBuilder(parser: SQLParser) {
 				throw new Error("fromSource is not a CstNode array");
 			}
 
-			const source = this.visit(fromSourceNodes) as TableSource | SubquerySource;
+			const source = this.visit(fromSourceNodes) as
+				| TableSource
+				| SubquerySource;
 
 			const from: FromClause = {
 				type: "FromClause",
@@ -116,7 +118,7 @@ export function createASTBuilder(parser: SQLParser) {
 			} else if (ctx.StringLiteral) {
 				const stringTokens = ctx.StringLiteral as IToken[];
 				const rawValue = stringTokens[0].image;
-				tableName = rawValue.slice(1, -1); // Remove quotes
+				tableName = unescapeStringLiteral(rawValue);
 			} else {
 				throw new Error("Missing table name in fromSource");
 			}
@@ -174,7 +176,7 @@ export function createASTBuilder(parser: SQLParser) {
 			} else if (ctx.StringLiteral) {
 				const stringTokens = ctx.StringLiteral as IToken[];
 				const rawValue = stringTokens[0].image;
-				tableName = rawValue.slice(1, -1); // Remove quotes
+				tableName = unescapeStringLiteral(rawValue);
 			} else {
 				throw new Error("Missing table name in joinClause");
 			}
@@ -367,7 +369,7 @@ export function createASTBuilder(parser: SQLParser) {
 				const stringTokens = ctx.StringLiteral as IToken[];
 				// Remove quotes from string literal
 				const rawValue = stringTokens[0].image;
-				const value = rawValue.slice(1, -1); // Remove surrounding quotes
+				const value = unescapeStringLiteral(rawValue);
 				const strLiteral: StringLiteral = {
 					type: "StringLiteral",
 					value,

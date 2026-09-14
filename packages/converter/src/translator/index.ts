@@ -1,10 +1,11 @@
 // Translator Module
-export {
-	ASTToAlgebraTranslator,
-	translationResultToString,
-} from "./ASTToAlgebraTranslator";
+
 export {
 	AlgebraToMermaidTranslator,
 	algebraToMermaidMarkdown,
 } from "./AlgebraToMermaidTranslator";
+export {
+	ASTToAlgebraTranslator,
+	translationResultToString,
+} from "./ASTToAlgebraTranslator";
 export type * from "./types";

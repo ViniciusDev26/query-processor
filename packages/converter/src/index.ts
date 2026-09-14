@@ -26,13 +26,14 @@ export { SQLParseError } from "./errors";
 export { RelationalAlgebraOptimizer } from "./optimizer";
 export type * from "./optimizer/types";
 export {
-	ASTToAlgebraTranslator,
-	translationResultToString,
 	AlgebraToMermaidTranslator,
+	ASTToAlgebraTranslator,
 	algebraToMermaidMarkdown,
+	translationResultToString,
 } from "./translator";
 export type * from "./translator/types";
 export { SchemaValidationError } from "./validator/SchemaValidationError";
+export { SchemaValidator } from "./validator/SchemaValidator";
 export type * from "./validator/types";
 
 export interface ParseSuccess {

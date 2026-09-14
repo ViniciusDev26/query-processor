@@ -1,8 +1,8 @@
 import { CstParser } from "chevrotain";
 import {
-	allTokens,
 	And,
 	As,
+	allTokens,
 	Comma,
 	Cross,
 	Dot,
@@ -104,7 +104,7 @@ export class SQLParser extends CstParser {
 
 	// [INNER | CROSS] JOIN table [AS alias] [ON condition]
 	private joinClause = this.RULE("joinClause", () => {
-		const isCrossJoin = this.OPTION(() => {
+		this.OPTION(() => {
 			this.OR([
 				{ ALT: () => this.CONSUME(Inner) },
 				{ ALT: () => this.CONSUME(Cross) },

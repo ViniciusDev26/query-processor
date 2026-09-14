@@ -383,9 +383,7 @@ describe("SchemaValidator", () => {
 		});
 
 		it("should validate JOIN with table aliases", () => {
-			const ast = parse(
-				"SELECT * FROM users u JOIN products p ON u.id = p.id",
-			);
+			const ast = parse("SELECT * FROM users u JOIN products p ON u.id = p.id");
 			const errors = validator.validate(ast);
 			expect(errors).toHaveLength(0);
 		});
@@ -434,6 +432,19 @@ describe("SchemaValidator", () => {
 
 			const errors = validator.validate(ast);
 			expect(errors).toHaveLength(0);
+		});
+
+		it("should reject JOIN ON condition comparing two columns from the same table/alias", () => {
+			// Both sides of the ON condition qualify with the same alias "u",
+			// so the condition can never relate "u" to "products" - likely a typo.
+			const ast = parse(
+				"SELECT * FROM users u JOIN products p ON u.id = u.age",
+			);
+			const errors = validator.validate(ast);
+			expect(errors.length).toBeGreaterThan(0);
+			expect(errors.some((e) => e.type === "INVALID_JOIN_CONDITION")).toBe(
+				true,
+			);
 		});
 	});
 });

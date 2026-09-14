@@ -37,7 +37,9 @@ describe(avoidCartesianProduct.name, () => {
 
 		// Rule should be applied
 		expect(result.appliedRules.length).toBeGreaterThan(0);
-		expect(result.appliedRules[0]).toContain("Convert Cartesian product to join");
+		expect(result.appliedRules[0]).toContain(
+			"Convert Cartesian product to join",
+		);
 	});
 
 	it("should handle multiple relations in cross product", () => {
@@ -281,5 +283,34 @@ describe(avoidCartesianProduct.name, () => {
 		// Should convert to join (condition involves both employees and departments)
 		expect(result.node.type).toBe("Join");
 		expect(result.appliedRules.length).toBeGreaterThan(0);
+	});
+
+	it("should not convert when a relation name only appears as a letter inside unrelated words", () => {
+		// σ[b.status = 'active'](a × b)
+		// The condition only qualifies columns on "b" ("active" and "status"
+		// both happen to contain the letter "a"), so this must NOT be treated
+		// as a join condition that also involves relation "a".
+		const input: RelationalAlgebraNode = {
+			type: "Selection",
+			condition: "b.status = 'active'",
+			input: {
+				type: "CrossProduct",
+				left: {
+					type: "Relation",
+					name: "a",
+				},
+				right: {
+					type: "Relation",
+					name: "b",
+				},
+			},
+		};
+
+		const result = avoidCartesianProduct(input);
+
+		// Should remain as selection over cross product (no false-positive join)
+		expect(result.node.type).toBe("Selection");
+		expect((result.node as any).input.type).toBe("CrossProduct");
+		expect(result.appliedRules).toHaveLength(0);
 	});
 });

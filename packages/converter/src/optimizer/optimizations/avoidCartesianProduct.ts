@@ -5,6 +5,10 @@ import type {
 	RelationalAlgebraNode,
 	Selection,
 } from "@/algebra/types";
+import {
+	conditionReferencesAnyRelation,
+	getRelationNames,
+} from "../../algebra/utils";
 
 export interface AvoidCartesianProductResult {
 	node: RelationalAlgebraNode;
@@ -12,61 +16,19 @@ export interface AvoidCartesianProductResult {
 }
 
 /**
- * Extracts relation names from a node recursively
- */
-function extractRelationNames(node: RelationalAlgebraNode): Set<string> {
-	const relations = new Set<string>();
-
-	function traverse(n: RelationalAlgebraNode): void {
-		switch (n.type) {
-			case "Relation":
-				relations.add(n.name);
-				break;
-			case "Selection":
-			case "Projection":
-				traverse(n.input);
-				break;
-			case "Join":
-			case "CrossProduct":
-				traverse(n.left);
-				traverse(n.right);
-				break;
-		}
-	}
-
-	traverse(node);
-	return relations;
-}
-
-/**
- * Checks if a condition involves attributes from specific relations
- * This is a simplified heuristic that looks for relation names in the condition
+ * Checks if a condition involves qualified column references (e.g. "rel.col")
+ * from both the left and the right side of a cross product, which means it
+ * is really a join condition.
  */
 function conditionInvolves(
 	condition: string,
 	leftRelations: Set<string>,
 	rightRelations: Set<string>,
 ): boolean {
-	// Check if condition mentions relations from both sides
-	let mentionsLeft = false;
-	let mentionsRight = false;
-
-	for (const rel of leftRelations) {
-		if (condition.includes(rel)) {
-			mentionsLeft = true;
-			break;
-		}
-	}
-
-	for (const rel of rightRelations) {
-		if (condition.includes(rel)) {
-			mentionsRight = true;
-			break;
-		}
-	}
-
-	// A join condition should involve both sides
-	return mentionsLeft && mentionsRight;
+	return (
+		conditionReferencesAnyRelation(condition, leftRelations) &&
+		conditionReferencesAnyRelation(condition, rightRelations)
+	);
 }
 
 /**
@@ -133,8 +95,8 @@ export function avoidCartesianProduct(
 			const crossProduct = input as CrossProduct;
 
 			// Extract relation names from both sides
-			const leftRelations = extractRelationNames(crossProduct.left);
-			const rightRelations = extractRelationNames(crossProduct.right);
+			const leftRelations = getRelationNames(crossProduct.left);
+			const rightRelations = getRelationNames(crossProduct.right);
 
 			// Check if the condition involves both sides (making it a join condition)
 			if (conditionInvolves(node.condition, leftRelations, rightRelations)) {

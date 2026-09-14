@@ -94,9 +94,7 @@ describe("SQLParser", () => {
 	});
 
 	it("should parse WHERE with string literals", () => {
-		const { cst, errors } = parse(
-			"SELECT * FROM users WHERE name = 'John'",
-		);
+		const { cst, errors } = parse("SELECT * FROM users WHERE name = 'John'");
 
 		expect(errors).toHaveLength(0);
 		expect(cst).toBeDefined();
@@ -130,9 +128,7 @@ describe("SQLParser", () => {
 	});
 
 	it("should parse SELECT with columns and WHERE", () => {
-		const { cst, errors } = parse(
-			"SELECT id, name FROM users WHERE age > 18",
-		);
+		const { cst, errors } = parse("SELECT id, name FROM users WHERE age > 18");
 
 		expect(errors).toHaveLength(0);
 		expect(cst).toBeDefined();
@@ -164,9 +160,7 @@ describe("SQLParser", () => {
 	});
 
 	it("should parse WHERE with parenthesized expression", () => {
-		const { cst, errors } = parse(
-			"SELECT * FROM users WHERE (age > 18)",
-		);
+		const { cst, errors } = parse("SELECT * FROM users WHERE (age > 18)");
 
 		expect(errors).toHaveLength(0);
 		expect(cst).toBeDefined();
@@ -200,17 +194,13 @@ describe("SQLParser", () => {
 	});
 
 	it("should fail on unmatched opening parenthesis", () => {
-		const { errors } = parse(
-			"SELECT * FROM users WHERE (age > 18",
-		);
+		const { errors } = parse("SELECT * FROM users WHERE (age > 18");
 
 		expect(errors.length).toBeGreaterThan(0);
 	});
 
 	it("should fail on unmatched closing parenthesis", () => {
-		const { errors } = parse(
-			"SELECT * FROM users WHERE age > 18)",
-		);
+		const { errors } = parse("SELECT * FROM users WHERE age > 18)");
 
 		expect(errors.length).toBeGreaterThan(0);
 	});

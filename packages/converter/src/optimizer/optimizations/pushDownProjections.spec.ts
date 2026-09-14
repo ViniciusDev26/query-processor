@@ -320,15 +320,19 @@ describe(pushDownProjections.name, () => {
 
 		// Left side should have projection with Cliente attributes (case-insensitive match)
 		expect(join.left.type).toBe("Projection");
-		expect(join.left.attributes.some((attr: string) =>
-			attr.toLowerCase().includes("cliente")
-		)).toBe(true);
+		expect(
+			join.left.attributes.some((attr: string) =>
+				attr.toLowerCase().includes("cliente"),
+			),
+		).toBe(true);
 
 		// Right side should have projection with Pedido attributes
 		expect(join.right.type).toBe("Projection");
-		expect(join.right.attributes.some((attr: string) =>
-			attr.toLowerCase().includes("pedido")
-		)).toBe(true);
+		expect(
+			join.right.attributes.some((attr: string) =>
+				attr.toLowerCase().includes("pedido"),
+			),
+		).toBe(true);
 	});
 
 	it("should push projections through nested joins recursively", () => {
@@ -413,5 +417,38 @@ describe(pushDownProjections.name, () => {
 
 		// No rules should be applied (already optimal)
 		expect(result.appliedRules).toHaveLength(0);
+	});
+
+	it("should ignore qualified-looking text inside string literals when collecting join attributes", () => {
+		// π[u.name](u ⨝[u.status = 'o.total'] o)
+		// The literal 'o.total' must NOT be mistaken for a real reference to
+		// relation "o"'s "total" column - it's just a string value being
+		// compared, so it shouldn't push a bogus attribute onto the right side.
+		const input: RelationalAlgebraNode = {
+			type: "Projection",
+			attributes: ["u.name"],
+			input: {
+				type: "Join",
+				condition: "u.status = 'o.total'",
+				left: {
+					type: "Relation",
+					name: "u",
+				},
+				right: {
+					type: "Relation",
+					name: "o",
+				},
+			},
+		};
+
+		const result = pushDownProjections(input);
+
+		const join = (result.node as any).input;
+		expect(join.type).toBe("Join");
+
+		// No attribute should have been fabricated from the string literal,
+		// so the right side has nothing to project and stays a plain relation.
+		expect(join.right.type).toBe("Relation");
+		expect(join.right.name).toBe("o");
 	});
 });

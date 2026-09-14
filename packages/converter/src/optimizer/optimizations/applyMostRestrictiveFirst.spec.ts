@@ -197,9 +197,7 @@ describe(applyMostRestrictiveFirst.name, () => {
 
 		// Structure should remain the same
 		expect(result.node.type).toBe("Join");
-		expect((result.node as any).condition).toBe(
-			"users.id = orders.user_id",
-		);
+		expect((result.node as any).condition).toBe("users.id = orders.user_id");
 
 		// No rules applied (no selections to reorder)
 		expect(result.appliedRules).toHaveLength(0);
@@ -244,6 +242,54 @@ describe(applyMostRestrictiveFirst.name, () => {
 
 		expect(result.node.type).toBe("Relation");
 		expect((result.node as any).name).toBe("users");
+		expect(result.appliedRules).toHaveLength(0);
+	});
+
+	it("should reorder join operands to put the smaller side first", () => {
+		// (a ⨝ b) ⨝ c
+		// The right side ("c", 1 relation) is smaller than the left side
+		// ("a ⨝ b", 2 relations), so operands should be swapped.
+		const input: RelationalAlgebraNode = {
+			type: "Join",
+			condition: "b.id = c.b_id",
+			left: {
+				type: "Join",
+				condition: "a.id = b.a_id",
+				left: { type: "Relation", name: "a" },
+				right: { type: "Relation", name: "b" },
+			},
+			right: { type: "Relation", name: "c" },
+		};
+
+		const result = applyMostRestrictiveFirst(input);
+
+		expect(result.node.type).toBe("Join");
+		const join = result.node as any;
+		// Smaller side ("c") should now be on the left
+		expect(join.left.type).toBe("Relation");
+		expect(join.left.name).toBe("c");
+		expect(join.right.type).toBe("Join");
+
+		expect(
+			result.appliedRules.some((rule) =>
+				rule.includes("Reorder join operands"),
+			),
+		).toBe(true);
+	});
+
+	it("should not reorder join operands when both sides are equally sized", () => {
+		const input: RelationalAlgebraNode = {
+			type: "Join",
+			condition: "users.id = orders.user_id",
+			left: { type: "Relation", name: "users" },
+			right: { type: "Relation", name: "orders" },
+		};
+
+		const result = applyMostRestrictiveFirst(input);
+
+		const join = result.node as any;
+		expect(join.left.name).toBe("users");
+		expect(join.right.name).toBe("orders");
 		expect(result.appliedRules).toHaveLength(0);
 	});
 });

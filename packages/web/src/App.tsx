@@ -1,14 +1,15 @@
 import {
-	parseSQL,
-	type ValidationError,
-	validateSQL,
 	algebraToMermaidMarkdown,
+	parseSQL,
+	SchemaValidator,
+	type SelectStatement,
+	type ValidationError,
 } from "@query-processor/converter";
 import { useState } from "react";
 import { CodeViewer } from "./components/CodeViewer";
+import { MermaidComparison } from "./components/MermaidComparison";
 import { SqlEditor } from "./components/SqlEditor";
 import { ValidationErrors } from "./components/ValidationErrors";
-import { MermaidComparison } from "./components/MermaidComparison";
 import { databaseSchema } from "./schema";
 
 interface QueryResult {
@@ -51,8 +52,10 @@ function App() {
 			return;
 		}
 
-		// Validate against schema
-		const errors = validateSQL(sqlQuery, databaseSchema);
+		// Validate against schema (reuse the AST already produced by parseSQL
+		// above instead of parsing the query a second time)
+		const validator = new SchemaValidator(databaseSchema);
+		const errors = validator.validate(result.ast as SelectStatement);
 
 		if (errors.length > 0) {
 			setValidationErrors(errors);

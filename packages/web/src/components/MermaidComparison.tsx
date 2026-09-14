@@ -49,7 +49,7 @@ export function MermaidComparison({
 					</h3>
 					<ul className="list-disc list-inside text-gray-300 space-y-1">
 						{appliedRules.map((rule, index) => (
-							<li key={index} className="text-sm">
+							<li key={`${index}-${rule}`} className="text-sm">
 								{rule}
 							</li>
 						))}

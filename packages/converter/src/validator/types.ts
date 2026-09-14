@@ -55,7 +55,8 @@ export interface ValidationError {
 		| "UNKNOWN_COLUMN"
 		| "TYPE_MISMATCH"
 		| "INVALID_COMPARISON"
-		| "AMBIGUOUS_COLUMN";
+		| "AMBIGUOUS_COLUMN"
+		| "INVALID_JOIN_CONDITION";
 	/** Error message */
 	message: string;
 	/** Table name if applicable */

@@ -1,14 +1,14 @@
 import type { RelationalAlgebraNode } from "../algebra/types";
 import type {
-	SelectStatement,
+	BinaryExpression,
 	Column,
 	Expression,
-	BinaryExpression,
+	JoinClause,
 	LogicalExpression,
 	Operand,
-	TableSource,
+	SelectStatement,
 	SubquerySource,
-	JoinClause,
+	TableSource,
 } from "../ast/types";
 import type { TranslationResult } from "./types";
 
@@ -103,7 +103,7 @@ export class ASTToAlgebraTranslator {
 			return this.translateSubquery((from.source as SubquerySource).subquery);
 		}
 
-		throw new Error(`Unknown FROM source type: ${(from.source as any).type}`);
+		throw new Error(`Unknown FROM source type: ${from.source.type}`);
 	}
 
 	/**
@@ -208,7 +208,7 @@ export class ASTToAlgebraTranslator {
 			return `(${left} ${log.operator} ${right})`;
 		}
 
-		throw new Error(`Unknown expression type: ${(expression as any).type}`);
+		throw new Error(`Unknown expression type: ${expression.type}`);
 	}
 
 	/**
@@ -226,7 +226,7 @@ export class ASTToAlgebraTranslator {
 			return `'${operand.value}'`;
 		}
 
-		throw new Error(`Unknown operand type: ${(operand as any).type}`);
+		throw new Error(`Unknown operand type: ${operand.type}`);
 	}
 
 	/**

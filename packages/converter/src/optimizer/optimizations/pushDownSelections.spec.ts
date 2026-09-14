@@ -213,7 +213,9 @@ describe(pushDownSelections.name, () => {
 		expect(rightSide.name).toBe("orders");
 
 		expect(result.appliedRules.length).toBeGreaterThan(0);
-		expect(result.appliedRules[0]).toContain("Push selection to left side of join");
+		expect(result.appliedRules[0]).toContain(
+			"Push selection to left side of join",
+		);
 	});
 
 	it("should push single selection to right side of join when it only references right relation", () => {
@@ -252,7 +254,9 @@ describe(pushDownSelections.name, () => {
 		expect(rightSide.input.name).toBe("orders");
 
 		expect(result.appliedRules.length).toBeGreaterThan(0);
-		expect(result.appliedRules[0]).toContain("Push selection to right side of join");
+		expect(result.appliedRules[0]).toContain(
+			"Push selection to right side of join",
+		);
 	});
 
 	it("should decompose compound AND condition and push each predicate to appropriate side", () => {

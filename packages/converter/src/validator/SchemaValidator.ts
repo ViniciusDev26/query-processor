@@ -79,12 +79,16 @@ export class SchemaValidator {
 				const actualJoinTableName = this.findTableName(join.table);
 				if (actualJoinTableName) {
 					const joinAlias = join.alias || actualJoinTableName;
-					this.availableTables.set(joinAlias.toLowerCase(), actualJoinTableName);
+					this.availableTables.set(
+						joinAlias.toLowerCase(),
+						actualJoinTableName,
+					);
 				}
 
 				// Validate ON condition (if present - not required for CROSS JOIN)
 				if (join.on) {
 					this.validateExpression(join.on);
+					this.validateJoinSelfReference(join.on);
 				}
 			}
 		}
@@ -157,7 +161,9 @@ export class SchemaValidator {
 			actualColumnName = parts[1];
 
 			// Try to find table by alias first
-			const resolvedTable = this.availableTables.get(tableOrAlias.toLowerCase());
+			const resolvedTable = this.availableTables.get(
+				tableOrAlias.toLowerCase(),
+			);
 			if (!resolvedTable) {
 				this.errors.push({
 					type: "UNKNOWN_TABLE",
@@ -174,7 +180,7 @@ export class SchemaValidator {
 			// If we have multiple tables (JOINs), column reference is ambiguous
 			if (this.availableTables.size > 1) {
 				// Try to find the column in any of the available tables
-				let foundInTables: string[] = [];
+				const foundInTables: string[] = [];
 				for (const [, tblName] of this.availableTables) {
 					const actualTblName = this.findTableName(tblName);
 					if (!actualTblName) continue;
@@ -233,7 +239,10 @@ export class SchemaValidator {
 	/**
 	 * Find the actual column name in a table (case-insensitive lookup)
 	 */
-	private findColumnName(table: TableSchema, columnName: string): string | undefined {
+	private findColumnName(
+		table: TableSchema,
+		columnName: string,
+	): string | undefined {
 		const lowerColumnName = columnName.toLowerCase();
 		return Object.keys(table.columns).find(
 			(name) => name.toLowerCase() === lowerColumnName,
@@ -283,6 +292,49 @@ export class SchemaValidator {
 	}
 
 	/**
+	 * Flags JOIN ON conditions that compare two columns qualified with the
+	 * exact same table/alias (e.g. "ON a.x = a.y"). Such a condition can
+	 * never relate the joined table to anything else, so it is never a
+	 * meaningful join predicate and almost always indicates a typo (e.g. the
+	 * wrong side should have referenced a different table/alias).
+	 */
+	private validateJoinSelfReference(expression: Expression): void {
+		if (expression.type === "LogicalExpression") {
+			this.validateJoinSelfReference(expression.left);
+			this.validateJoinSelfReference(expression.right);
+			return;
+		}
+
+		if (expression.type !== "BinaryExpression") return;
+
+		const { left, right } = expression;
+		if (left.type !== "ColumnReference" || right.type !== "ColumnReference") {
+			return;
+		}
+
+		const leftAlias = this.resolveOperandAlias(left.name);
+		const rightAlias = this.resolveOperandAlias(right.name);
+
+		if (leftAlias && rightAlias && leftAlias === rightAlias) {
+			this.errors.push({
+				type: "INVALID_JOIN_CONDITION",
+				message: `Join condition compares two columns from the same table/alias ('${leftAlias}'): '${left.name}' = '${right.name}' can never relate this join to another table`,
+			});
+		}
+	}
+
+	/**
+	 * Extracts the table/alias qualifier from a qualified column reference
+	 * (e.g. "a.x" → "a"). Returns undefined for unqualified references, since
+	 * those can't be checked for this rule without resolving ambiguity.
+	 */
+	private resolveOperandAlias(columnName: string): string | undefined {
+		const parts = columnName.split(".");
+		if (parts.length !== 2) return undefined;
+		return parts[0].toLowerCase();
+	}
+
+	/**
 	 * Get the type of an operand
 	 */
 	private getOperandType(operand: Operand): ColumnType | null {
@@ -317,7 +369,9 @@ export class SchemaValidator {
 			actualColumnName = parts[1];
 
 			// Try to find table by alias first
-			const resolvedTable = this.availableTables.get(tableOrAlias.toLowerCase());
+			const resolvedTable = this.availableTables.get(
+				tableOrAlias.toLowerCase(),
+			);
 			if (!resolvedTable) {
 				this.errors.push({
 					type: "UNKNOWN_TABLE",

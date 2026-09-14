@@ -116,14 +116,7 @@ export interface StringLiteral {
 	value: string;
 }
 
-export type ComparisonOperator =
-	| "="
-	| "!="
-	| "<>"
-	| "<"
-	| "<="
-	| ">"
-	| ">=";
+export type ComparisonOperator = "=" | "!=" | "<>" | "<" | "<=" | ">" | ">=";
 export type LogicalOperator = "AND" | "OR";
 
 export type ASTNode =

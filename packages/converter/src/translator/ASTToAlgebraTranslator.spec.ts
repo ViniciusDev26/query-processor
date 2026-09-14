@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ASTToAlgebraTranslator, translationResultToString } from "./ASTToAlgebraTranslator";
-import type { SelectStatement } from "../ast/types";
 import type { RelationalAlgebraNode } from "../algebra/types";
+import type { SelectStatement } from "../ast/types";
+import {
+	ASTToAlgebraTranslator,
+	translationResultToString,
+} from "./ASTToAlgebraTranslator";
 
 describe("ASTToAlgebraTranslator", () => {
 	const translator = new ASTToAlgebraTranslator();
@@ -248,7 +251,9 @@ describe("ASTToAlgebraTranslator", () => {
 			const result = translator.algebraToString(node);
 
 			// Should use proper theoretical notation throughout
-			expect(result).toBe("π[name](σ[age > 18](users ⨝[users.id = orders.user_id] orders))");
+			expect(result).toBe(
+				"π[name](σ[age > 18](users ⨝[users.id = orders.user_id] orders))",
+			);
 			// Verify no spaces between operators and brackets
 			expect(result).not.toMatch(/[πσ⨝] \[/);
 		});

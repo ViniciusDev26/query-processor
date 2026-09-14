@@ -5,6 +5,10 @@ import type {
 	RelationalAlgebraNode,
 	Selection,
 } from "@/algebra/types";
+import {
+	extractQualifiedAttributes,
+	getRelationNames,
+} from "../../algebra/utils";
 
 export interface PushDownProjectionsResult {
 	node: RelationalAlgebraNode;
@@ -12,56 +16,13 @@ export interface PushDownProjectionsResult {
 }
 
 /**
- * Extracts all attribute names from a list of qualified attributes
- * Keeps only the qualified version (e.g., "TB1.name" not "name")
- * Example: ["TB1.name", "TB3.sal"] → ["TB1.name", "TB3.sal"]
- */
-function extractAttributeNames(attributes: string[]): Set<string> {
-	return new Set(attributes);
-}
-
-/**
- * Extracts attribute names from a join/selection condition
- * Keeps only qualified versions when available
- * Example: "TB1.PK = TB2.FK" → ["TB1.PK", "TB2.FK"]
+ * Extracts attribute names from a join/selection condition.
+ * Ignores anything inside string literals (e.g. "name = 'a.b'" yields no
+ * attributes from the literal "a.b").
+ * Example: "TB1.PK = TB2.FK" → {"TB1.PK", "TB2.FK"}
  */
 function extractAttributesFromCondition(condition: string): Set<string> {
-	const result = new Set<string>();
-	// Match patterns like "table.column"
-	const matches = condition.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*\b/g);
-	if (matches) {
-		for (const match of matches) {
-			result.add(match);
-		}
-	}
-	return result;
-}
-
-/**
- * Gets all relation names from a subtree
- */
-function getRelationNames(node: RelationalAlgebraNode): Set<string> {
-	const relations = new Set<string>();
-
-	function traverse(n: RelationalAlgebraNode): void {
-		switch (n.type) {
-			case "Relation":
-				relations.add(n.name);
-				break;
-			case "Selection":
-			case "Projection":
-				traverse(n.input);
-				break;
-			case "Join":
-			case "CrossProduct":
-				traverse(n.left);
-				traverse(n.right);
-				break;
-		}
-	}
-
-	traverse(node);
-	return relations;
+	return new Set(extractQualifiedAttributes(condition));
 }
 
 /**
@@ -95,7 +56,9 @@ function attributeBelongsToSide(
  * NOTE: We DON'T collect attributes from selections because those are only needed
  * for filtering and can be discarded after the selection is applied.
  */
-function collectAttributesFromSubtree(node: RelationalAlgebraNode): Set<string> {
+function collectAttributesFromSubtree(
+	node: RelationalAlgebraNode,
+): Set<string> {
 	const attributes = new Set<string>();
 
 	function traverse(n: RelationalAlgebraNode): void {
@@ -114,7 +77,7 @@ function collectAttributesFromSubtree(node: RelationalAlgebraNode): Set<string> 
 				}
 				traverse(n.input);
 				break;
-			case "Join":
+			case "Join": {
 				// Add attributes from join condition
 				const joinAttrs = extractAttributesFromCondition(n.condition);
 				for (const attr of joinAttrs) {
@@ -123,6 +86,7 @@ function collectAttributesFromSubtree(node: RelationalAlgebraNode): Set<string> 
 				traverse(n.left);
 				traverse(n.right);
 				break;
+			}
 			case "CrossProduct":
 				traverse(n.left);
 				traverse(n.right);
@@ -218,7 +182,7 @@ export function pushDownProjections(
 			const join = input as Join;
 
 			// Get attributes needed from projection
-			const projectionAttrs = extractAttributeNames(node.attributes);
+			const projectionAttrs = new Set(node.attributes);
 
 			// Skip if it's a wildcard projection
 			if (!node.attributes.includes("*")) {
@@ -291,7 +255,10 @@ export function pushDownProjections(
 	 * When optimizing joins, we need to introduce projections on each side
 	 * to keep only the attributes needed for this join and any parent operations
 	 */
-	function optimizeJoin(node: Join, neededAttrs?: Set<string>): RelationalAlgebraNode {
+	function optimizeJoin(
+		node: Join,
+		neededAttrs?: Set<string>,
+	): RelationalAlgebraNode {
 		// Get attributes needed for the join condition
 		const joinAttrs = extractAttributesFromCondition(node.condition);
 
@@ -344,7 +311,9 @@ export function pushDownProjections(
 					// There's already a projection - check if it has all needed attributes
 					const existingProj = optimizedLeft as Projection;
 					const existingAttrs = new Set(existingProj.attributes);
-					const missingAttrs = leftAttrs.filter((attr) => !existingAttrs.has(attr));
+					const missingAttrs = leftAttrs.filter(
+						(attr) => !existingAttrs.has(attr),
+					);
 
 					if (missingAttrs.length > 0) {
 						// Update the projection to include missing attributes
@@ -353,7 +322,9 @@ export function pushDownProjections(
 						);
 						optimizedLeft = {
 							type: "Projection",
-							attributes: Array.from(new Set([...existingProj.attributes, ...leftAttrs])),
+							attributes: Array.from(
+								new Set([...existingProj.attributes, ...leftAttrs]),
+							),
 							input: existingProj.input,
 						};
 					}
@@ -385,7 +356,9 @@ export function pushDownProjections(
 					// There's already a projection - check if it has all needed attributes
 					const existingProj = optimizedRight as Projection;
 					const existingAttrs = new Set(existingProj.attributes);
-					const missingAttrs = rightAttrs.filter((attr) => !existingAttrs.has(attr));
+					const missingAttrs = rightAttrs.filter(
+						(attr) => !existingAttrs.has(attr),
+					);
 
 					if (missingAttrs.length > 0) {
 						// Update the projection to include missing attributes
@@ -394,7 +367,9 @@ export function pushDownProjections(
 						);
 						optimizedRight = {
 							type: "Projection",
-							attributes: Array.from(new Set([...existingProj.attributes, ...rightAttrs])),
+							attributes: Array.from(
+								new Set([...existingProj.attributes, ...rightAttrs]),
+							),
 							input: existingProj.input,
 						};
 					}

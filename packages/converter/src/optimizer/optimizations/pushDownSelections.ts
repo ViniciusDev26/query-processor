@@ -5,6 +5,11 @@ import type {
 	RelationalAlgebraNode,
 	Selection,
 } from "@/algebra/types";
+import {
+	conditionReferencesAnyRelation,
+	extractQualifiedAttributes,
+	getRelationNames,
+} from "../../algebra/utils";
 
 export interface PushDownSelectionsResult {
 	node: RelationalAlgebraNode;
@@ -85,75 +90,6 @@ function decomposeAndCondition(condition: string): string[] {
 }
 
 /**
- * Extracts relation names from a subtree
- */
-function extractRelationNames(node: RelationalAlgebraNode): Set<string> {
-	const relations = new Set<string>();
-
-	function traverse(n: RelationalAlgebraNode): void {
-		switch (n.type) {
-			case "Relation":
-				relations.add(n.name);
-				break;
-			case "Selection":
-			case "Projection":
-				traverse(n.input);
-				break;
-			case "Join":
-			case "CrossProduct":
-				traverse(n.left);
-				traverse(n.right);
-				break;
-		}
-	}
-
-	traverse(node);
-	return relations;
-}
-
-/**
- * Checks if a predicate references any of the given relations
- * Case-insensitive comparison to handle SQL's case-insensitive identifiers
- */
-function predicateReferences(
-	predicate: string,
-	relations: Set<string>,
-): boolean {
-	const predicateLower = predicate.toLowerCase();
-	for (const relation of relations) {
-		// Check for qualified column references like "TB1.id" or "users.age"
-		// Use case-insensitive comparison since SQL identifiers are typically case-insensitive
-		if (predicateLower.includes(`${relation.toLowerCase()}.`)) {
-			return true;
-		}
-	}
-	return false;
-}
-
-/**
- * Extracts all qualified column references from a condition
- * Example: "TB1.id > 300 AND TB2.name = 'test'" → ["TB1.id", "TB2.name"]
- */
-function extractAttributes(condition: string): string[] {
-	const attributes: string[] = [];
-
-	// First, remove string literals to avoid matching patterns inside them
-	// Replace single-quoted strings with placeholders
-	const withoutStrings = condition.replace(/'[^']*'/g, "''");
-
-	// Match qualified column references like "table.column"
-	const regex = /\b([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)\b/g;
-	let match: RegExpExecArray | null;
-
-	// biome-ignore lint: while with assignment is intentional
-	while ((match = regex.exec(withoutStrings)) !== null) {
-		attributes.push(match[1]);
-	}
-
-	return Array.from(new Set(attributes)); // Remove duplicates
-}
-
-/**
  * Heuristic 1: Push selections down
  *
  * Moves selection operations as close to the base relations as possible.
@@ -207,7 +143,7 @@ export function pushDownSelections(
 			const projection = input as Projection;
 
 			// Extract attributes referenced in the selection condition
-			const selectionAttrs = extractAttributes(node.condition);
+			const selectionAttrs = extractQualifiedAttributes(node.condition);
 
 			// Merge projection attributes with selection attributes, removing duplicates
 			const allAttributes = Array.from(
@@ -252,14 +188,14 @@ export function pushDownSelections(
 
 			if (predicates.length === 1) {
 				// Single predicate - check if it can be pushed to one side
-				const leftRelations = extractRelationNames(binary.left);
-				const rightRelations = extractRelationNames(binary.right);
+				const leftRelations = getRelationNames(binary.left);
+				const rightRelations = getRelationNames(binary.right);
 
-				const referencesLeft = predicateReferences(
+				const referencesLeft = conditionReferencesAnyRelation(
 					predicates[0],
 					leftRelations,
 				);
-				const referencesRight = predicateReferences(
+				const referencesRight = conditionReferencesAnyRelation(
 					predicates[0],
 					rightRelations,
 				);
@@ -328,7 +264,9 @@ export function pushDownSelections(
 
 				// If it references both sides, keep it above the join
 				const optimizedBinary =
-					input.type === "Join" ? optimizeJoin(binary as Join) : optimizeCrossProduct(binary as CrossProduct);
+					input.type === "Join"
+						? optimizeJoin(binary as Join)
+						: optimizeCrossProduct(binary as CrossProduct);
 
 				return {
 					type: "Selection",
@@ -338,16 +276,22 @@ export function pushDownSelections(
 			}
 
 			// Multiple predicates - decompose and push each to appropriate side
-			const leftRelations = extractRelationNames(binary.left);
-			const rightRelations = extractRelationNames(binary.right);
+			const leftRelations = getRelationNames(binary.left);
+			const rightRelations = getRelationNames(binary.right);
 
 			const leftPredicates: string[] = [];
 			const rightPredicates: string[] = [];
 			const remainingPredicates: string[] = [];
 
 			for (const predicate of predicates) {
-				const referencesLeft = predicateReferences(predicate, leftRelations);
-				const referencesRight = predicateReferences(predicate, rightRelations);
+				const referencesLeft = conditionReferencesAnyRelation(
+					predicate,
+					leftRelations,
+				);
+				const referencesRight = conditionReferencesAnyRelation(
+					predicate,
+					rightRelations,
+				);
 
 				if (referencesLeft && !referencesRight) {
 					leftPredicates.push(predicate);
