@@ -1,8 +1,8 @@
 # Query Processor
 
-> O que o seu banco de dados faz por baixo dos panos quando você roda um `SELECT` — só que visível, editável e explicado passo a passo.
+> What your database does under the hood when you run a `SELECT` — except visible, editable, and explained step by step.
 
-**SQL → AST → Álgebra Relacional → Álgebra Relacional Otimizada.** Um parser de SQL escrito do zero em TypeScript, acoplado a um editor web que mostra, lado a lado, a árvore de execução de uma query antes e depois de passar pelas mesmas heurísticas de otimização que um SGBD de verdade (PostgreSQL, MySQL...) aplicaria internamente.
+**SQL → AST → Relational Algebra → Optimized Relational Algebra.** A SQL parser written from scratch in TypeScript, paired with a web editor that shows, side by side, the execution tree of a query before and after going through the same optimization heuristics a real RDBMS (PostgreSQL, MySQL...) would apply internally.
 
 ```sql
 SELECT users.name, orders.total
@@ -11,7 +11,7 @@ INNER JOIN orders ON users.id = orders.user_id
 WHERE users.age > 18 AND orders.total > 100
 ```
 
-Isso não vira só um resultado — vira uma árvore de álgebra relacional:
+This doesn't just become a result — it becomes a relational algebra tree:
 
 ```
 π(users.name, orders.total)
@@ -20,40 +20,40 @@ Isso não vira só um resultado — vira uma árvore de álgebra relacional:
         └── σ(orders.total > 100)(orders)
 ```
 
-com as seleções e projeções já empurradas para o mais perto possível das tabelas base, exatamente como um otimizador de query real faria antes de decidir o plano de execução.
+with selections and projections already pushed as close as possible to the base relations, exactly like a real query optimizer would do before deciding on an execution plan.
 
-## Por que isso existe
+## Why this exists
 
-Todo banco de dados relacional traduz o SQL que você escreve em uma **árvore de álgebra relacional** e depois reescreve essa árvore para rodar mais rápido — sem mudar o resultado. Esse processo normalmente é uma caixa-preta escondida dentro do otimizador de query do banco.
+Every relational database translates the SQL you write into a **relational algebra tree** and then rewrites that tree to run faster — without changing the result. That process is usually a black box hidden inside the database's query optimizer.
 
-Este projeto expõe esse processo: um lexer e parser de SQL construídos do zero (sem depender de nenhuma lib de parsing de SQL pronta), um tradutor para álgebra relacional formal, e um otimizador heurístico que aplica, na ordem certa, as mesmas transformações clássicas de um livro de banco de dados. Serve tanto para estudar teoria de banco de dados na prática quanto como base para experimentar novas regras de otimização.
+This project exposes that process: a SQL lexer and parser built from scratch (no off-the-shelf SQL parsing library), a translator into formal relational algebra, and a heuristic optimizer that applies, in the right order, the same classic transformations you'd find in a database textbook. It's useful both for studying database theory hands-on and as a base for experimenting with new optimization rules.
 
-## O que ele já sabe fazer
+## What it can already do
 
-- **Parsing completo de `SELECT`**: `WHERE` com `AND`/`OR`/parênteses, `INNER JOIN` e `CROSS JOIN` com colunas qualificadas (`tabela.coluna`), subqueries no `FROM`
-- **Tradução para álgebra relacional formal**: projeção (`π`), seleção (`σ`), junção (`⋈`) e produto cartesiano (`×`)
-- **Otimizador com 4 heurísticas aplicadas em cascata**, cada uma assumindo o resultado da anterior:
-  1. *Push-down de seleções* — filtra o mais cedo possível, perto dos dados
-  2. *Push-down de projeções* — descarta colunas desnecessárias antes das junções
-  3. *Condições mais restritivas primeiro* — reordena seleções e junções por seletividade estimada
-  4. *Eliminação de produto cartesiano* — converte `×` em `⋈` sempre que uma condição permitir
-- **Validação semântica** contra um schema de banco (tabelas/colunas case-insensitive, compatibilidade de tipos em comparações, detecção de condições de `JOIN` inválidas)
-- **Nunca lança exceção**: toda a API é baseada em resultado (`{ success, ... }`), com mensagens de erro detalhadas em cada etapa (lexer, parser, tradutor, validador)
-- **Editor web** com Monaco, autocomplete ciente do schema, e diagramas Mermaid comparando a árvore original com a otimizada — incluindo a lista de regras aplicadas em cada query
+- **Full `SELECT` parsing**: `WHERE` with `AND`/`OR`/parentheses, `INNER JOIN` and `CROSS JOIN` with qualified columns (`table.column`), subqueries in `FROM`
+- **Translation to formal relational algebra**: projection (`π`), selection (`σ`), join (`⋈`), and cross product (`×`)
+- **Optimizer with 4 heuristics applied in cascade**, each one assuming the previous one already ran:
+  1. *Push down selections* — filter as early as possible, close to the data
+  2. *Push down projections* — drop unneeded columns before joins
+  3. *Most restrictive conditions first* — reorder selections and joins by estimated selectivity
+  4. *Avoid cartesian product* — convert `×` into `⋈` whenever a condition allows it
+- **Semantic validation** against a database schema (case-insensitive tables/columns, type compatibility in comparisons, detection of invalid `JOIN` conditions)
+- **Never throws**: the whole API is result-based (`{ success, ... }`), with detailed error messages at every stage (lexer, parser, translator, validator)
+- **Web editor** with Monaco, schema-aware autocomplete, and Mermaid diagrams comparing the original tree with the optimized one — including the list of rules applied to each query
 
-**SQL suportado hoje:**
+**SQL supported today:**
 ```sql
--- Consultas básicas
+-- Basic queries
 SELECT * FROM users
 SELECT id, name FROM users
 SELECT * FROM users WHERE age > 18
 
--- Condições complexas
+-- Complex conditions
 SELECT * FROM users WHERE age >= 18 AND status = 'active'
 SELECT * FROM users WHERE age < 18 OR age > 65
 SELECT * FROM users WHERE (age > 18 AND status = 'active') OR premium = true
 
--- INNER JOIN com colunas qualificadas
+-- INNER JOIN with qualified columns
 SELECT users.id, orders.total
 FROM users
 INNER JOIN orders ON users.id = orders.user_id
@@ -61,55 +61,55 @@ INNER JOIN orders ON users.id = orders.user_id
 -- CROSS JOIN
 SELECT * FROM users CROSS JOIN orders
 
--- Subqueries no FROM
+-- Subqueries in FROM
 SELECT * FROM (SELECT id, name FROM users) AS active_users
 ```
 
-## Estrutura do monorepo
+## Monorepo structure
 
 ```
 query-processor/
 ├── packages/
-│   ├── converter/   # Lexer, parser, AST, tradutor, otimizador e validador de schema
-│   └── web/          # Editor SQL interativo (Monaco) com visualização em Mermaid
-└── package.json      # Configuração raiz do monorepo (npm workspaces)
+│   ├── converter/   # Lexer, parser, AST, translator, optimizer, and schema validator
+│   └── web/          # Interactive SQL editor (Monaco) with Mermaid visualization
+└── package.json      # Root monorepo config (npm workspaces)
 ```
 
 ### `@query-processor/converter`
 
-Biblioteca TypeScript publicável isoladamente, com o pipeline completo: **Lexer → Parser (CST, via [Chevrotain](https://chevrotain.io/)) → AST → Álgebra Relacional → Otimizador**.
+Standalone, publishable TypeScript library with the full pipeline: **Lexer → Parser (CST, via [Chevrotain](https://chevrotain.io/)) → AST → Relational Algebra → Optimizer**.
 
 **Stack:** TypeScript, Chevrotain, Vitest
 
 ### `web`
 
-Editor SQL interativo para ver o pipeline do converter em ação: tema escuro, validação em tempo real contra um schema de banco, visualizador de schema, e comparação visual (Mermaid) entre a árvore original e a otimizada.
+Interactive SQL editor to see the converter's pipeline in action: dark theme, real-time validation against a database schema, schema viewer, and a visual (Mermaid) comparison between the original and optimized trees.
 
 **Stack:** React 19, Monaco Editor, Vite, Tailwind CSS 4, Mermaid
 
-Veja [`packages/web/src/utils/README.md`](packages/web/src/utils/README.md) para detalhes de como o autocomplete de SQL é conectado ao Monaco.
+See [`packages/web/src/utils/README.md`](packages/web/src/utils/README.md) for details on how the SQL autocomplete is wired into Monaco.
 
-## Começando
+## Getting started
 
-### Instalar dependências
+### Install dependencies
 
 ```bash
 npm install
 ```
 
-### Build de todos os pacotes
+### Build all packages
 
 ```bash
 npm run build
 ```
 
-### Rodar os testes
+### Run tests
 
 ```bash
-# Todos os testes
+# All tests
 npm test
 
-# Só o converter
+# Converter only
 npm run test:converter
 
 # Watch mode
@@ -117,24 +117,24 @@ cd packages/converter
 npm run test:watch
 ```
 
-### Desenvolvimento
+### Development
 
 ```bash
-# Editor web
+# Web editor
 cd packages/web
 npm run dev
 
-# Build do converter
+# Build the converter
 cd packages/converter
 npm run build
 ```
 
-### Usando o converter como biblioteca
+### Using the converter as a library
 
 ```typescript
 import { parseSQL, validateSQL } from '@query-processor/converter';
 
-// Parseia SQL e já retorna AST, tradução para álgebra e versão otimizada
+// Parse SQL and get back the AST, algebra translation, and optimized version
 const result = parseSQL('SELECT * FROM users WHERE age > 18');
 
 if (!result.success) {
@@ -143,10 +143,10 @@ if (!result.success) {
 }
 
 console.log('AST:', result.ast);
-console.log('Álgebra relacional:', result.translationString);
-console.log('Álgebra otimizada:', result.optimizationString);
+console.log('Relational algebra:', result.translationString);
+console.log('Optimized algebra:', result.optimizationString);
 
-// Valida SQL contra um schema
+// Validate SQL against a schema
 const schema = {
   tables: {
     users: {
@@ -165,6 +165,6 @@ if (errors.length > 0) {
 }
 ```
 
-## Licença
+## License
 
 ISC
