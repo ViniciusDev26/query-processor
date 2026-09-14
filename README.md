@@ -2,6 +2,8 @@
 
 > What your database does under the hood when you run a `SELECT` — except visible, editable, and explained step by step.
 
+**🔗 Live demo:** [query-processor-web.vercel.app](https://query-processor-web.vercel.app/)
+
 **SQL → AST → Relational Algebra → Optimized Relational Algebra.** A SQL parser written from scratch in TypeScript, paired with a web editor that shows, side by side, the execution tree of a query before and after going through the same optimization heuristics a real RDBMS (PostgreSQL, MySQL...) would apply internally.
 
 ```sql
@@ -84,6 +86,8 @@ Standalone, publishable TypeScript library with the full pipeline: **Lexer → P
 ### `web`
 
 Interactive SQL editor to see the converter's pipeline in action: dark theme, real-time validation against a database schema, schema viewer, and a visual (Mermaid) comparison between the original and optimized trees.
+
+**Live at:** [query-processor-web.vercel.app](https://query-processor-web.vercel.app/)
 
 **Stack:** React 19, Monaco Editor, Vite, Tailwind CSS 4, Mermaid
 
