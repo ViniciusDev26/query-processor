@@ -171,4 +171,4 @@ if (errors.length > 0) {
 
 ## License
 
-ISC
+[Unlicense](LICENSE) — public domain. Use it, study it, copy it, modify it, sell it, whatever — no attribution or permission needed.
